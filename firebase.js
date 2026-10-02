@@ -20,8 +20,9 @@ const firebaseConfig = {
     appId: "1:139180338088:web:71f39a40073f14fe324b9d"
 };
 
-// gjatë Fazës 1: shkrim-lexim NË KOLEKSIONIN E TESTIT — të dhënat reale nuk preken
-export const USE_TEST_DATA = true;
+// KALIMI U CRONUA (Faza 3): aplikacioni tani punon me koleksionin REAL.
+// Për ta kthyer përsëri në test: USE_TEST_DATA = true
+export const USE_TEST_DATA = false;
 export const COLLECTION_TX = USE_TEST_DATA ? "transaksionet_test" : "transaksionet";
 
 const app = initializeApp(firebaseConfig);
