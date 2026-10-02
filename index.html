@@ -28,7 +28,7 @@
     <!-- ============ APLIKACIONI ============ -->
     <div id="screen-app" class="screen hidden">
         <header class="app-header">
-            <div class="hd-ic" id="hd-icon">📊</div>
+            <button class="hd-ic" id="hd-icon" onclick="App.headerTap()">📊</button>
             <div class="hd-tx">
                 <h1 id="hd-title">Paneli</h1>
                 <p id="hd-sub">Pasqyra financiare</p>
@@ -63,7 +63,7 @@
             <button data-tab="paneli" onclick="App.go('paneli')"><i>▦</i><span>Paneli</span></button>
             <button data-tab="trans" onclick="App.go('trans')"><i>📄</i><span>Trans.</span></button>
             <button class="fab" onclick="UI.openSheet()" aria-label="Regjistro">＋</button>
-            <button data-tab="gjendja" onclick="App.go('gjendja')"><i>👥</i><span>Gjendja</span></button>
+            <button data-tab="raporte" onclick="App.go('raporte')"><i>📈</i><span>Raporte</span></button>
             <button data-tab="menu" onclick="App.go('menu')"><i>☰</i><span>Më shumë</span></button>
         </nav>
     </div>

@@ -34,10 +34,19 @@ const ADD_TYPES = [
 ];
 
 const TABS = {
-    paneli:  { t: "Paneli",        s: "Pasqyra financiare",    ic: "📊" },
-    trans:   { t: "Transaksionet", s: "Të gjitha lëvizjet",    ic: "📄" },
-    gjendja: { t: "Gjendja",       s: "Ortakët Nexha & Gresa", ic: "👥" },
-    menu:    { t: "Më shumë",      s: "Vegla dhe raporte",     ic: "☰" }
+    paneli:  { t: "Paneli",        s: "Pasqyra financiare",  ic: "📊" },
+    trans:   { t: "Transaksionet", s: "Të gjitha lëvizjet",  ic: "📄" },
+    raporte: { t: "Raporte",       s: "Raportet financiare", ic: "📈" },
+    menu:    { t: "Më shumë",      s: "Vegla dhe raporte",   ic: "☰" }
+};
+
+// Pamjet e raporteve (hapen mbi skedat, me buton prapa)
+const VIEWS = {
+    raporteMujore: { t: "Raporte Mujore",     s: "Zgjidh muajin" },
+    mujor:         { t: "Detaje mujore",      s: "" },
+    raporteVjetor: { t: "Raporti Vjetor",     s: "Përmbledhja e vitit" },
+    pasqyraFin:    { t: "Pasqyra Financiare", s: "Raporti financiar" },
+    pasqyraOrtaku: { t: "Pasqyra e Ortakut",  s: "" }
 };
 
 const fmt = n => (n || 0).toLocaleString("mk-MK", { minimumFractionDigits: 2 });
@@ -47,7 +56,8 @@ const isoToDisplay = iso => { const p = iso.split("-"); return p.length === 3 ? 
 
 const S = {
     user: null, tx: [], tab: "paneli", year: String(new Date().getFullYear()),
-    month: "", type: "", search: "", limit: 30, chart: null, loading: false
+    month: "", type: "", search: "", limit: 30, chart: null, loading: false,
+    view: null, viewMonth: null, viewPartner: null, viewStack: []
 };
 
 // ============================================================ UI ndihmës
@@ -134,9 +144,14 @@ function rPaneli(st) {
     h += card("SHPENZIMET", st.shpenzime, "var(--red)");
     h += card("FITIMI NETO", st.fitimi, st.fitimi >= 0 ? "var(--green-d)" : "var(--red)");
     h += `</div><div class="sec-title">👥 GJENDJA E ORTAKËVE</div>`;
-    h += partnerRow("Nexha", st.pN, "50% partneritet");
-    h += partnerRow("Gresa", st.pG, "50% partneritet");
-    h += `<div class="chart-card"><h3>Hyrje vs Dalje</h3><div class="sub">${esc(S.year || "Të gjitha vitet")}</div>
+    h += partnerRow("Nexha", st.pN, "50% partneritet — kliko për pasqyrën");
+    h += partnerRow("Gresa", st.pG, "50% partneritet — kliko për pasqyrën");
+    h += `<div class="sec-title">💼 TËRHEQJET & INVESTIMET</div><div class="grid2">`;
+    h += card("TËRHEQJET NEXHA", st.thN, "var(--purple)");
+    h += card("TËRHEQJET GRESA", st.thG, "var(--purple)");
+    h += card("INVESTIMI NEXHA", st.inN, "var(--blue)");
+    h += card("INVESTIMI GRESA", st.inG, "var(--blue)");
+    h += `</div><div class="chart-card"><h3>Hyrje vs Dalje</h3><div class="sub">${esc(S.year || "Të gjitha vitet")}</div>
           <div class="chart-box"><canvas id="chart"></canvas></div></div>`;
     return h;
 }
@@ -224,16 +239,163 @@ function fillTxList() {
         + (list.length > S.limit ? `<button class="load-more" onclick="App.more()">Shfaq më shumë (${list.length - S.limit} të tjera)</button>` : "");
 }
 
-function rGjendja(st) {
-    let h = `<div class="sec-title">📅 ${esc(S.year || "Të gjitha vitet")}</div><div class="grid2">`;
-    h += card("TËRHEQJET NEXHA", st.thN, "var(--purple)");
-    h += card("TËRHEQJET GRESA", st.thG, "var(--purple)");
-    h += card("INVESTIMI NEXHA", st.inN, "var(--blue)");
-    h += card("INVESTIMI GRESA", st.inG, "var(--blue)");
-    h += `</div><div class="sec-title">Kliko për pasqyrën e plotë</div>`;
-    h += partnerRow("Nexha", st.pN, "Sa i mbetet");
-    h += partnerRow("Gresa", st.pG, "Sa i mbetet");
+const MONTHS = ["Janar", "Shkurt", "Mars", "Prill", "Maj", "Qershor", "Korrik", "Gusht", "Shtator", "Tetor", "Nëntor", "Dhjetor"];
+
+function monthData(year) {
+    const arr = [];
+    for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, "0");
+        const ts = S.tx.filter(t => { const p = String(t.data || "").split("-"); return p.length === 3 && p[2] === year && p[1] === mm; });
+        const shitje = ts.filter(t => t.tipi === "Shitje").reduce((s, t) => s + t.shuma, 0);
+        const teArdhura = ts.filter(t => t.tipi === "Të Ardhura").reduce((s, t) => s + t.shuma, 0);
+        const shpenzime = Math.abs(ts.filter(t => t.tipi === "Shpenzim").reduce((s, t) => s + t.shuma, 0));
+        arr.push({ m: mm, name: MONTHS[m - 1] + " " + year, shitje, teArdhura, shpenzime, fitimi: shitje - shpenzime, ts });
+    }
+    return arr;
+}
+
+function rRaporte() {
+    const item = (ic, t, s, fn) => `<button class="row-card" onclick="${fn}"><div class="row-ic" style="background:#e6f6f0">${ic}</div><div class="row-tx"><b>${t}</b><span>${s}</span></div><div class="row-val" style="color:#9ca3af;font-size:18px">›</div></button>`;
+    let h = `<div class="sec-title">📊 RAPORTE</div>`;
+    h += item("📅", "Raporte Mujore", "Shitje & shpenzime për 12 muaj", "App.openView('raporteMujore')");
+    h += item("📈", "Raporti Vjetor", "Përmbledhje + analiza mujore", "App.openView('raporteVjetor')");
+    h += item("📊", "Pasqyra Financiare", "Raporti financiar i plotë", "App.openView('pasqyraFin')");
+    h += `<div class="sec-title">👥 PASQYRA E ORTAKËVE</div>`;
+    h += item("👩", "Pasqyra e Nexha", "Bilanci final për periudhën", "App.openStatement('Nexha')");
+    h += item("👩", "Pasqyra e Gresa", "Bilanci final për periudhën", "App.openStatement('Gresa')");
     return h;
+}
+
+function rMujoreList() {
+    const months = monthData(S.year);
+    let h = `<div class="sec-title">📅 Viti: ${esc(S.year)}</div>`;
+    months.forEach(mo => {
+        const fitCls = mo.fitimi >= 0 ? "pos" : "neg";
+        h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:10px" onclick="App.openMonth('${mo.m}')">
+            <div style="font-size:14px;font-weight:800;margin-bottom:8px">🗓️ ${esc(mo.name)}</div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="color:var(--muted)">Shitje:</span><b class="pos">${fmt(mo.shitje)} MKD</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="color:var(--muted)">Shpenzime:</span><b class="neg">${fmt(mo.shpenzime)} MKD</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px"><span style="color:var(--muted)">Fitimi:</span><b class="${fitCls}">${fmt(mo.fitimi)} MKD</b></div>
+            <div style="font-size:11px;color:var(--muted)">📊 ${mo.ts.length} transaksione • Kliko për detaje</div>
+        </button>`;
+    });
+    return h;
+}
+
+function rMujorDetail() {
+    const mo = S.viewMonth;
+    if (!mo) return "";
+    let h = `<div class="card" style="background:#f0fdf6;border-color:#cdeeda;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">TOTALI I SHITJEVE</span><b class="pos">${fmt(mo.shitje)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">TOTALI I SHPENZIMEVE</span><b class="neg">${fmt(mo.shpenzime)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">FITIMI BRUTO</span><b class="${mo.fitimi >= 0 ? "pos" : "neg"}">${fmt(mo.fitimi)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">TRANSAKSIONE</span><b>${mo.ts.length}</b></div>
+    </div>`;
+    h += `<button class="load-more" onclick="App.exportMonth()">📄 Eksporto muajin në Excel (CSV)</button>`;
+    h += mo.ts.length ? mo.ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione këtë muaj.</div>`;
+    return h;
+}
+
+function rVjetor(st) {
+    let h = `<div class="sec-title">📊 PËRMBLEDHJA — ${esc(S.year || "Të gjitha vitet")}</div><div class="grid2">`;
+    h += card("SHITJET", st.shitje, "var(--green-d)");
+    h += card("TË ARDHURA NGA DEPOZITI BANKAR", st.teArdhura, "var(--green-d)");
+    h += card("SHPENZIMET", st.shpenzime, "var(--red)");
+    h += card("FITIMI NETO", st.fitimi, st.fitimi >= 0 ? "var(--green-d)" : "var(--red)");
+    h += card("INVESTIMET", st.inN + st.inG, "var(--blue)");
+    h += card("TËRHEQJET", st.thN + st.thG, "var(--purple)");
+    h += `</div>`;
+    h += `<button class="load-more" onclick="App.exportVjetor()">📄 Eksporto në Excel (CSV)</button>`;
+    const months = monthData(S.year);
+    h += `<div class="sec-title">📅 ANALIZA MUJORE</div>`;
+    months.forEach(mo => {
+        const fitCls = mo.fitimi >= 0 ? "pos" : "neg";
+        h += `<div class="card" style="margin-bottom:10px">
+            <div style="font-size:13px;font-weight:800;margin-bottom:6px">${esc(mo.name)}</div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Shitje:</span><b class="pos">${fmt(mo.shitje)} MKD</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Shpenzime:</span><b class="neg">${fmt(mo.shpenzime)} MKD</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="color:var(--muted)">Fitimi:</span><b class="${fitCls}">${fmt(mo.fitimi)} MKD</b></div>
+        </div>`;
+    });
+    return h;
+}
+
+function rFinanciar(st) {
+    const katMap = {};
+    st.ts.filter(t => t.tipi === "Shpenzim").forEach(t => {
+        const k = t.kategoria || "Te tjera";
+        katMap[k] = (katMap[k] || 0) + Math.abs(t.shuma);
+    });
+    const katList = Object.entries(katMap).sort((a, b) => b[1] - a[1]);
+    let h = `<div class="sec-title">📊 RAPORTI FINANCIAR — ${esc(S.year || "Të gjitha vitet")}</div><div class="grid2">`;
+    h += card("SHITJET", st.shitje, "var(--green-d)");
+    h += card("HARXHIMET", st.shpenzime, "var(--red)");
+    h += card("FITIMI " + (st.fitimi >= 0 ? "POZITIV ✓" : "NEGATIV ⚠"), st.fitimi, st.fitimi >= 0 ? "var(--green-d)" : "var(--red)");
+    h += card("TË ARDHURA NGA DEPOZITI", st.teArdhura, "var(--blue)");
+    h += `</div>`;
+    h += `<button class="load-more" onclick="App.exportFinanciar()">📄 Eksporto në Excel (CSV)</button>`;
+    h += `<div class="sec-title">📂 HARXHIMET SIPAS KATEGORIVE</div>`;
+    if (!katList.length) h += `<div class="empty">Nuk ka harxhime për këtë periudhë.</div>`;
+    katList.forEach(([k, v]) => {
+        const pct = st.shpenzime > 0 ? ((v / st.shpenzime) * 100).toFixed(1) : "0.0";
+        h += `<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:13px;font-weight:700">📂 ${esc(k)}</div>
+            <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="neg">${fmt(v)} MKD</div>
+            <div style="font-size:11px;color:var(--muted)">${pct}% e harxhimeve</div></div>
+        </div>`;
+    });
+    const months = monthData(S.year);
+    h += `<div class="sec-title">📅 ANALIZA MUJORE</div>`;
+    months.forEach(mo => {
+        if (!mo.ts.length && !mo.shitje && !mo.shpenzime) return;
+        const fitCls = mo.fitimi >= 0 ? "pos" : "neg";
+        h += `<div class="card" style="margin-bottom:10px">
+            <div style="font-size:13px;font-weight:800;margin-bottom:6px">${esc(mo.name)}</div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Shitje (hyrjet):</span><b class="pos">${fmt(mo.shitje)} MKD</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Harxhimet:</span><b class="neg">${fmt(mo.shpenzime)} MKD</b></div>
+            <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="color:var(--muted)">Fitimi:</span><b class="${fitCls}">${fmt(mo.fitimi)} MKD</b></div>
+        </div>`;
+    });
+    return h;
+}
+
+function rStatement(st) {
+    const name = S.viewPartner;
+    const th = name === "Nexha" ? st.thN : st.thG;
+    const inv = name === "Nexha" ? st.inN : st.inG;
+    const pjesa = name === "Nexha" ? st.pN : st.pG;
+    const pjesaFitimi = (st.fitimi / 2) + (st.teArdhura / 2);
+    const fitCls = v => v >= 0 ? "pos" : "neg";
+    let h = `<div class="sec-title">👤 ${esc(name)} — ${esc(S.year || "Të gjitha vitet")}</div>`;
+    h += `<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">💰 Shitja e Rrymës</span><b class="pos">${fmt(st.shitje)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">🔋 − Shpenzimet Operative</span><b class="neg">${fmt(st.shpenzime)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding-top:8px;border-top:1px solid var(--line);margin-bottom:6px"><b>📊 Fitimi Neto Operativ</b><b class="${fitCls(st.fitimi)}">${fmt(st.fitimi)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">🏦 Të Ardhura nga Depoziti Bankar</span><b class="pos">${fmt(st.teArdhura)} MKD</b></div>
+    </div>`;
+    h += `<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">✅ 50% e Fitimit Neto</span><b class="pos">${fmt(st.fitimi / 2)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">🏦 50% e Të Ardhurave Bankare</span><b class="pos">${fmt(st.teArdhura / 2)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;padding-top:8px;border-top:1px solid var(--line);margin-bottom:6px"><b>📋 Gjithsej i takon ${esc(name)}</b><b class="pos">${fmt(pjesaFitimi)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">💸 Tërheqjet e ${esc(name)}</span><b class="neg">−${fmt(th)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">💼 + Investimi i ${esc(name)} (kthim)</span><b style="color:var(--blue)">+${fmt(inv)} MKD</b></div>
+    </div>`;
+    h += `<div class="card" style="background:${pjesa >= 0 ? "#f0fdf6" : "#fdecec"};border-color:${pjesa >= 0 ? "#cdeeda" : "#f5c6c6"}">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">📋 BILANCI FINAL — ${esc(name.toUpperCase())}</div>
+        <div style="font-size:22px;font-weight:800" class="${fitCls(pjesa)}">${pjesa >= 0 ? "+" : ""}${fmt(pjesa)} MKD</div>
+        <div style="font-size:12px;margin-top:4px" class="${fitCls(pjesa)}">${pjesa >= 0 ? "✅ " + name + " ka për të marrë edhe " + fmt(pjesa) + " MKD" : "⚠️ " + name + " ka marrë " + fmt(Math.abs(pjesa)) + " MKD më shumë se fitimi i saj"}</div>
+    </div>`;
+    h += `<button class="load-more" onclick="App.exportStatement()">📄 Eksporto pasqyrën në Excel (CSV)</button>`;
+    return h;
+}
+
+function downloadCsv(name, rows) {
+    const csv = "\uFEFF" + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(";")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
 }
 
 function rMenu() {
@@ -256,22 +418,42 @@ function render() {
     document.getElementById("year-select").innerHTML =
         `<option value="" ${S.year === "" ? "selected" : ""}>Të gjitha vitet</option>` +
         years().map(y => `<option value="${y}" ${y === S.year ? "selected" : ""}>${y}</option>`).join("");
+
+    // koka: buton prapa kur është hapur një raport
+    const inView = !!S.view;
+    const ic = document.getElementById("hd-icon");
+    ic.textContent = inView ? "←" : TABS[S.tab].ic;
+    ic.classList.toggle("back", inView);
+    const meta = inView ? VIEWS[S.view] : TABS[S.tab];
+    let title = meta.t, sub = meta.s;
+    if (S.view === "mujor" && S.viewMonth) { title = S.viewMonth.name; sub = "Detajet e muajit"; }
+    if (S.view === "pasqyraOrtaku" && S.viewPartner) { title = "Pasqyra e " + S.viewPartner; sub = "Bilanci final"; }
+    document.getElementById("hd-title").textContent = title;
+    document.getElementById("hd-sub").textContent = sub;
+    document.getElementById("year-select").style.display = (!inView && S.tab === "menu") ? "none" : "";
+
     const st = stats(S.year);
     let html = "";
-    if (S.tab === "paneli") html = rPaneli(st);
+    if (S.view === "raporteMujore") html = rMujoreList();
+    else if (S.view === "mujor") html = rMujorDetail();
+    else if (S.view === "raporteVjetor") html = rVjetor(st);
+    else if (S.view === "pasqyraFin") html = rFinanciar(st);
+    else if (S.view === "pasqyraOrtaku") html = rStatement(st);
+    else if (S.tab === "paneli") html = rPaneli(st);
     else if (S.tab === "trans") html = rTrans();
-    else if (S.tab === "gjendja") html = rGjendja(st);
+    else if (S.tab === "raporte") html = rRaporte();
     else html = rMenu();
     document.getElementById("main").innerHTML = html;
-    if (S.tab === "trans") fillTxList();
-    if (S.tab === "paneli") drawChart(S.year);
+    if (S.tab === "trans" && !inView) fillTxList();
+    if (S.tab === "paneli" && !inView) drawChart(S.year);
 }
 
 // ============================================================ App — veprimet
 const App = {
     state: S,  // qasje për debug/testim
     go(tab) {
-        S.tab = tab; S.limit = 30; UI.closeSheet(); UI.closeForm();
+        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = [];
+        UI.closeSheet(); UI.closeForm();
         document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === tab));
         const meta = TABS[tab];
         document.getElementById("hd-title").textContent = meta.t;
@@ -289,9 +471,67 @@ const App = {
     more() { S.limit += 30; fillTxList(); },
     toggleTx(el) { document.querySelectorAll(".tx-card.open").forEach(c => { if (c !== el) c.classList.remove("open"); }); el.classList.toggle("open"); },
 
-    openStatement(name) {
+    pushView() { S.viewStack.push({ view: S.view, viewMonth: S.viewMonth, viewPartner: S.viewPartner, tab: S.tab }); },
+    openView(id) { this.pushView(); S.view = id; S.limit = 30; UI.closeSheet(); UI.closeForm(); render(); window.scrollTo(0, 0); },
+    back() {
+        const prev = S.viewStack.pop() || { view: null, viewMonth: null, viewPartner: null, tab: S.tab };
+        S.view = prev.view; S.viewMonth = prev.viewMonth; S.viewPartner = prev.viewPartner; S.tab = prev.tab;
+        document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === S.tab));
+        render(); window.scrollTo(0, 0);
+    },
+    headerTap() { if (S.view) this.back(); },
+    openMonth(m) {
+        this.pushView();
+        S.viewMonth = monthData(S.year).find(mo => mo.m === m);
+        S.view = "mujor"; render(); window.scrollTo(0, 0);
+    },
+    openStatement(name) { this.pushView(); S.viewPartner = name; S.view = "pasqyraOrtaku"; render(); window.scrollTo(0, 0); },
+
+    exportMonth() {
+        const mo = S.viewMonth; if (!mo) return;
+        const rows = [["SunEnergy Pro — Raporti Mujor: " + mo.name], [],
+            ["Totali i Shitjeve", fmt(mo.shitje) + " MKD"], ["Totali i Shpenzimeve", fmt(mo.shpenzime) + " MKD"],
+            ["Fitimi Bruto", fmt(mo.fitimi) + " MKD"], [], ["Data", "Tipi", "Përshkrimi", "Kategoria", "Shuma"]];
+        mo.ts.forEach(t => rows.push([t.data, t.tipi, t.pershkrimi, t.kategoria, fmt(t.shuma) + " MKD"]));
+        downloadCsv("SunEnergy_Raporti_" + mo.name.replace(" ", "_") + ".csv", rows);
+        UI.toast("📥 CSV u shkarkua");
+    },
+    exportVjetor() {
+        const st = stats(S.year), months = monthData(S.year);
+        const rows = [["SunEnergy Pro — Raporti Vjetor: " + (S.year || "Të gjitha vitet")], [],
+            ["Shitjet", fmt(st.shitje) + " MKD"], ["Të Ardhura nga Depoziti Bankar", fmt(st.teArdhura) + " MKD"],
+            ["Shpenzimet", fmt(st.shpenzime) + " MKD"], ["Fitimi Neto", fmt(st.fitimi) + " MKD"],
+            ["Investimet", fmt(st.inN + st.inG) + " MKD"], ["Tërheqjet", fmt(st.thN + st.thG) + " MKD"], [],
+            ["Muaji", "Shitje", "Shpenzime", "Fitimi"]];
+        months.forEach(mo => rows.push([mo.name, fmt(mo.shitje), fmt(mo.shpenzime), fmt(mo.fitimi)]));
+        downloadCsv("SunEnergy_Raporti_Vjetor_" + (S.year || "Te_gjitha") + ".csv", rows);
+        UI.toast("📥 CSV u shkarkua");
+    },
+    exportFinanciar() {
         const st = stats(S.year);
-        UI.toast(`${name}: ${fmt(name === "Nexha" ? st.pN : st.pG)} MKD — pasqyra e plotë vjen në Fazën 2`, false);
+        const katMap = {};
+        st.ts.filter(t => t.tipi === "Shpenzim").forEach(t => { const k = t.kategoria || "Te tjera"; katMap[k] = (katMap[k] || 0) + Math.abs(t.shuma); });
+        const rows = [["SunEnergy Pro — Pasqyra Financiare: " + (S.year || "Të gjitha vitet")], [],
+            ["Shitjet", fmt(st.shitje) + " MKD"], ["Harxhimet", fmt(st.shpenzime) + " MKD"],
+            ["Fitimi", fmt(st.fitimi) + " MKD"], ["Të Ardhura nga Depoziti Bankar", fmt(st.teArdhura) + " MKD"], [],
+            ["Kategoria", "Harxhimi", "% e harxhimeve"]];
+        Object.entries(katMap).sort((a, b) => b[1] - a[1]).forEach(([k, v]) =>
+            rows.push([k, fmt(v) + " MKD", st.shpenzime > 0 ? ((v / st.shpenzime) * 100).toFixed(1) + "%" : "0%"]));
+        downloadCsv("SunEnergy_Pasqyra_Financiare_" + (S.year || "Te_gjitha") + ".csv", rows);
+        UI.toast("📥 CSV u shkarkua");
+    },
+    exportStatement() {
+        const st = stats(S.year), name = S.viewPartner;
+        const th = name === "Nexha" ? st.thN : st.thG, inv = name === "Nexha" ? st.inN : st.inG;
+        const pjesa = name === "Nexha" ? st.pN : st.pG;
+        const rows = [["SunEnergy Pro — Pasqyra e Ortakut: " + name + " (" + (S.year || "Të gjitha vitet") + ")"], [],
+            ["Shitja e Rrymës", fmt(st.shitje) + " MKD"], ["Shpenzimet Operative", "-" + fmt(st.shpenzime) + " MKD"],
+            ["Fitimi Neto Operativ", fmt(st.fitimi) + " MKD"], ["Të Ardhura nga Depoziti Bankar", fmt(st.teArdhura) + " MKD"],
+            ["50% e Fitimit Neto", fmt(st.fitimi / 2) + " MKD"], ["50% e Të Ardhurave Bankare", fmt(st.teArdhura / 2) + " MKD"],
+            ["Tërheqjet e " + name, "-" + fmt(th) + " MKD"], ["Investimi i " + name + " (kthim)", "+" + fmt(inv) + " MKD"],
+            ["BILANCI FINAL", fmt(pjesa) + " MKD"]];
+        downloadCsv("SunEnergy_Pasqyra_" + name + "_" + (S.year || "Te_gjitha") + ".csv", rows);
+        UI.toast("📥 CSV u shkarkua");
     },
 
     openAdd(key) {
