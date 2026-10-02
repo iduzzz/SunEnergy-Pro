@@ -408,7 +408,13 @@ function downloadCsv(name, rows) {
 
 function rMenu() {
     const item = (ic, lbl, fn, danger) => `<button${danger ? ' class="danger"' : ""} onclick="${fn}"><span>${ic}</span>${lbl}</button>`;
-    return `<div class="menu-list">` +
+    const acc = S.user ? `<div class="card" style="margin-bottom:12px">
+        <div class="lbl">HYRUR SI</div>
+        <div style="font-size:14px;font-weight:700;margin-top:4px">${esc(S.user.email || "llogari pa email")}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all">UID: ${esc(S.user.uid || "")}</div>
+        ${USE_TEST_DATA ? '<div style="font-size:11px;color:var(--amber);margin-top:6px">⚠️ Fazë testimi — koleksioni: ' + COLLECTION_TX + '</div>' : ""}
+    </div>` : "";
+    return acc + `<div class="menu-list">` +
         item("💾", "Backup të Dhënave (JSON)", "App.backup()") +
         item("📥", "Importo Backup", "App.importBackup()") +
         item("🔄", "Rifresko të Dhënat", "App.refresh()") +
