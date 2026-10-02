@@ -49,6 +49,14 @@ const VIEWS = {
     pasqyraOrtaku: { t: "Pasqyra e Ortakut",  s: "" }
 };
 
+function friendlyError(e) {
+    const map = {
+        "permission-denied": "Nuk ka leje: rregullat e Firebase-s s'përfshijnë koleksionin e testit. Shto rregullin 'transaksionet_test' te Firestore → Rules (udhëzimet te zhvilluesi).",
+        "unavailable": "Nuk ka lidhje me internetin.",
+        "failed-precondition": "Firebase nuk është i disponueshëm. Provo më vonë."
+    };
+    return e && map[e.code] ? map[e.code] : (e && e.message ? e.message : String(e));
+}
 const fmt = n => (n || 0).toLocaleString("mk-MK", { minimumFractionDigits: 2 });
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -592,7 +600,7 @@ const App = {
     async refresh() {
         UI.toast("⏳ Duke ngarkuar nga Firebase...");
         try { S.tx = await loadAll(); render(); UI.toast("✅ " + S.tx.length + " transaksione të ngarkuara"); }
-        catch (e) { UI.toast("⚠️ " + e.message, true); }
+        catch (e) { UI.toast("⚠️ " + friendlyError(e), true); }
     },
     backup() {
         const blob = new Blob([JSON.stringify({ version: "pro-1.0", exported: new Date().toISOString(), collection: COLLECTION_TX, data: S.tx }, null, 2)], { type: "application/json" });
@@ -664,7 +672,7 @@ if (DEMO) {
             S.user = user;
             showApp();
             S.loading = true;
-            loadAll().then(list => { S.tx = list; }).catch(e => UI.toast("⚠️ " + e.message, true)).finally(() => { S.loading = false; render(); });
+            loadAll().then(list => { S.tx = list; }).catch(e => UI.toast("⚠️ " + friendlyError(e), true)).finally(() => { S.loading = false; render(); });
         } else {
             S.user = null; S.tx = [];
             showLogin();
