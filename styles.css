@@ -1,0 +1,172 @@
+/* ============================================================
+   SunEnergy Pro — stil i vetëm, i dizajnuar fillimisht për celular
+   (funksionon njësoj mirë në desktop përmes qendërzimit)
+   ============================================================ */
+:root {
+    --bg: #f4f6f5;
+    --card: #ffffff;
+    --ink: #111827;
+    --muted: #6b7280;
+    --line: #e8ecea;
+    --green: #0e9f6e;
+    --green-d: #0b7c56;
+    --red: #dc2626;
+    --purple: #7c3aed;
+    --blue: #0891b2;
+    --amber: #d97706;
+    --radius: 16px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
+             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.hidden { display: none !important; }
+.screen { min-height: 100vh; }
+
+/* ============ HYRJA ============ */
+#screen-login { display: flex; align-items: center; justify-content: center;
+                padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px);
+                background: linear-gradient(160deg, #10331f 0%, #0b7c56 100%); min-height: 100vh; }
+.login-box { background: #fff; border-radius: 24px; padding: 32px 26px; width: 100%; max-width: 380px;
+             box-shadow: 0 24px 60px rgba(0,0,0,0.25); text-align: center; }
+.login-logo { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 20px;
+              background: linear-gradient(135deg, var(--green), var(--green-d));
+              color: #fff; font-size: 30px; display: flex; align-items: center; justify-content: center; }
+.login-box h1 { margin: 0; font-size: 24px; font-weight: 800; }
+.login-box h1 span { color: var(--green-d); }
+.login-box > p { margin: 6px 0 22px; color: var(--muted); font-size: 13.5px; }
+#login-form input { width: 100%; padding: 14px; border: 1px solid var(--line); border-radius: 12px;
+                    font-size: 16px; margin-bottom: 12px; background: #f9fafb; font-family: inherit; }
+#login-form input:focus { outline: 2px solid var(--green); border-color: transparent; }
+.login-error { color: var(--red); font-size: 13px; font-weight: 600; min-height: 18px; margin-bottom: 8px; }
+.btn-primary { width: 100%; padding: 14px; border: none; border-radius: 12px; cursor: pointer;
+               background: linear-gradient(135deg, var(--green), var(--green-d));
+               color: #fff; font-size: 15px; font-weight: 700; font-family: inherit; }
+.btn-primary:disabled { opacity: 0.6; }
+.btn-ghost { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: none;
+             color: var(--muted); font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+/* ============ KOKA ============ */
+.app-header { position: sticky; top: 0; z-index: 400;
+              background: rgba(244,246,245,0.94); backdrop-filter: blur(14px);
+              display: flex; align-items: center; gap: 12px;
+              padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; }
+.hd-ic { width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
+         background: linear-gradient(135deg, var(--green), var(--green-d));
+         color: #fff; font-size: 20px; display: flex; align-items: center; justify-content: center; }
+.hd-tx { flex: 1; min-width: 0; }
+.hd-tx h1 { margin: 0; font-size: 20px; font-weight: 800; }
+.hd-tx p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.year-select { padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line);
+               background: #fff; font-size: 14px; font-weight: 700; font-family: inherit; }
+
+main { padding: 4px 16px calc(96px + env(safe-area-inset-bottom)); max-width: 720px; margin: 0 auto; }
+
+/* ============ KARTAT & SEKSIONET ============ */
+.sec-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800;
+             color: #374151; margin: 14px 2px 10px; letter-spacing: 0.3px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.card { background: var(--card); border-radius: var(--radius); padding: 14px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #eef1ef; }
+.card .lbl { font-size: 11.5px; color: var(--muted); font-weight: 700; letter-spacing: 0.4px; }
+.card .val { font-size: 16px; font-weight: 800; margin-top: 5px; word-break: break-word; }
+.row-card { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: var(--radius);
+            padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #eef1ef; width: 100%; text-align: left; cursor: pointer; font-family: inherit; }
+.row-ic { width: 42px; height: 42px; border-radius: 13px; display: flex; align-items: center;
+          justify-content: center; font-size: 19px; flex-shrink: 0; }
+.row-tx { flex: 1; min-width: 0; }
+.row-tx b { display: block; font-size: 14px; }
+.row-tx span { font-size: 12px; color: var(--muted); }
+.row-val { font-size: 14px; font-weight: 800; white-space: nowrap; }
+.pos { color: var(--green-d); } .neg { color: var(--red); }
+.chart-card { background: var(--card); border-radius: var(--radius); padding: 14px;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #eef1ef; margin-top: 14px; }
+.chart-card h3 { margin: 0; font-size: 15px; }
+.chart-card .sub { margin: 2px 0 10px; font-size: 12px; color: var(--muted); }
+.chart-box { height: 210px; position: relative; }
+.empty { text-align: center; color: var(--muted); font-size: 13px; padding: 34px 12px;
+         background: var(--card); border-radius: var(--radius); border: 1px dashed var(--line); }
+
+/* ============ FILTRAT & LISTA ============ */
+.filters { background: var(--card); border-radius: var(--radius); padding: 10px; margin-bottom: 12px;
+           box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #eef1ef;
+           display: flex; flex-wrap: wrap; gap: 8px; }
+.filters select, .filters input { flex: 1 1 44%; min-width: 0; padding: 9px 10px; border-radius: 10px;
+           border: 1px solid var(--line); font-size: 13px; background: #f9fafb; font-family: inherit; }
+.filters input { flex: 1 1 100%; }
+.count-line { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 1px; margin: 0 2px 8px; }
+.tx-card { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: var(--radius);
+           padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #eef1ef; }
+.tx-tx { flex: 1; min-width: 0; }
+.tx-tx b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-meta { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 10.5px; font-weight: 800; margin-left: 6px; }
+.tx-actions { display: none; gap: 8px; }
+.tx-card.open .tx-actions { display: flex; }
+.tx-actions button { width: 40px; height: 40px; border-radius: 12px; border: none; font-size: 16px; cursor: pointer; }
+.tx-actions .ed { background: #e8f1ff; } .tx-actions .de { background: #fdecec; }
+.load-more { display: block; width: 100%; margin: 12px auto; padding: 12px; border-radius: 12px; border: none;
+             background: var(--green-d); color: #fff; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; }
+
+/* ============ MENUJA "Më shumë" ============ */
+.menu-list { background: var(--card); border-radius: var(--radius); overflow: hidden;
+             box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #eef1ef; }
+.menu-list button { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none;
+                    border: none; border-bottom: 1px solid #f3f4f6; padding: 14px 16px; font-size: 14px;
+                    font-weight: 600; color: #374151; font-family: inherit; cursor: pointer; }
+.menu-list button:last-child { border-bottom: none; }
+.menu-list button.danger { color: var(--red); }
+.note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 14px; line-height: 1.5; }
+
+/* ============ SHIRITA (SHEETS) ============ */
+.sheet-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 950; }
+.sheet { display: none; position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+         z-index: 960; background: #fff; border-radius: 20px; padding: 18px;
+         box-shadow: 0 -6px 30px rgba(0,0,0,0.22); max-height: 82vh; overflow-y: auto; }
+.sheet.open, .sheet-bg.open { display: block; }
+.sheet h3 { margin: 0 0 12px; font-size: 15px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sheet-head h3 { margin: 0; }
+.x-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: #f3f4f6; cursor: pointer; font-size: 14px; }
+.add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.add-grid button { display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 12px;
+                   border: 1px solid var(--line); background: #f9fafb; font-size: 13px; font-weight: 700;
+                   color: #374151; font-family: inherit; cursor: pointer; }
+#form-fields label { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin: 12px 0 5px; }
+#form-fields input, #form-fields select { width: 100%; padding: 13px; border: 1px solid var(--line);
+        border-radius: 12px; font-size: 16px; background: #f9fafb; font-family: inherit; }
+#form-fields input:focus, #form-fields select:focus { outline: 2px solid var(--green); border-color: transparent; }
+.form-actions { display: flex; gap: 10px; margin-top: 18px; }
+.form-actions .btn-primary { flex: 1; }
+.form-actions .btn-ghost { flex: 0 0 32%; }
+
+/* ============ TAB BAR ============ */
+.tabbar { position: fixed; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 900;
+          background: #fff; border-radius: 18px; box-shadow: 0 6px 24px rgba(0,0,0,0.16);
+          display: flex; align-items: center; justify-content: space-around; padding: 6px 4px;
+          max-width: 688px; margin: 0 auto; }
+.tabbar button { border: none; background: none; font-size: 10.5px; font-weight: 700; color: #9ca3af;
+                 display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 7px 9px;
+                 border-radius: 12px; min-width: 58px; font-family: inherit; cursor: pointer; }
+.tabbar button i { font-style: normal; font-size: 19px; }
+.tabbar button.act { color: var(--green-d); background: #e6f6f0; }
+.tabbar .fab { width: 52px; height: 52px; border-radius: 50%; color: #fff; font-size: 26px; font-weight: 300;
+               background: linear-gradient(135deg, var(--green), var(--green-d)); display: flex; align-items: center;
+               justify-content: center; margin-top: -24px; box-shadow: 0 6px 16px rgba(14,159,110,0.45); }
+.tabbar .fab:active { transform: scale(0.96); }
+
+/* ============ TOAST ============ */
+.toast { position: fixed; bottom: calc(90px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
+         background: #111827; color: #fff; padding: 10px 18px; border-radius: 12px; font-size: 13px; font-weight: 600;
+         opacity: 0; pointer-events: none; transition: opacity 0.25s ease; z-index: 990; max-width: 88vw; text-align: center; }
+.toast.show { opacity: 1; }
+.toast.err { background: var(--red); }
+
+/* ============ DESKTOP (≥900px): e njëjta përvojë, e qendërzuar ============ */
+@media (min-width: 900px) {
+    main { max-width: 760px; }
+    .grid2 { gap: 12px; }
+    .sheet, .tabbar { left: 50%; transform: translateX(-50%); right: auto; width: 100%; }
+    .sheet { max-width: 560px; }
+    .tabbar { max-width: 560px; bottom: 18px; }
+}

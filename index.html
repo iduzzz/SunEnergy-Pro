@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>SunEnergy Pro — Menaxhimi Financiar</title>
+    <meta name="theme-color" content="#0b7c56">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- ============ HYRJA (LOGIN) ============ -->
+    <div id="screen-login" class="screen">
+        <div class="login-box">
+            <div class="login-logo">⚡</div>
+            <h1>SunEnergy <span>Pro</span></h1>
+            <p>Menaxhimi financiar — Nexha &amp; Gresa</p>
+            <form id="login-form">
+                <input type="email" id="login-email" placeholder="Email" autocomplete="username" required>
+                <input type="password" id="login-password" placeholder="Fjalëkalimi" autocomplete="current-password" required>
+                <div id="login-error" class="login-error"></div>
+                <button type="submit" class="btn-primary" id="login-btn">Hyr</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============ APLIKACIONI ============ -->
+    <div id="screen-app" class="screen hidden">
+        <header class="app-header">
+            <div class="hd-ic" id="hd-icon">📊</div>
+            <div class="hd-tx">
+                <h1 id="hd-title">Paneli</h1>
+                <p id="hd-sub">Pasqyra financiare</p>
+            </div>
+            <select id="year-select" class="year-select" onchange="App.setYear(this.value)"></select>
+        </header>
+
+        <main id="main"></main>
+
+        <!-- Fletë regjistrimi -->
+        <div class="sheet-bg" id="sheet-bg" onclick="UI.closeSheet()"></div>
+        <div class="sheet" id="add-sheet">
+            <h3>Regjistro transaksion</h3>
+            <div class="add-grid" id="add-grid"></div>
+        </div>
+        <div class="sheet" id="form-sheet">
+            <div class="sheet-head">
+                <h3 id="form-title">Transaksion i ri</h3>
+                <button class="x-btn" onclick="UI.closeForm()">✕</button>
+            </div>
+            <form id="tx-form" onsubmit="return App.saveTx(event)">
+                <input type="hidden" id="f-id">
+                <div id="form-fields"></div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="form-save">Ruaj</button>
+                    <button type="button" class="btn-ghost" onclick="UI.closeForm()">Anulo</button>
+                </div>
+            </form>
+        </div>
+
+        <nav class="tabbar">
+            <button data-tab="paneli" onclick="App.go('paneli')"><i>▦</i><span>Paneli</span></button>
+            <button data-tab="trans" onclick="App.go('trans')"><i>📄</i><span>Trans.</span></button>
+            <button class="fab" onclick="UI.openSheet()" aria-label="Regjistro">＋</button>
+            <button data-tab="gjendja" onclick="App.go('gjendja')"><i>👥</i><span>Gjendja</span></button>
+            <button data-tab="menu" onclick="App.go('menu')"><i>☰</i><span>Më shumë</span></button>
+        </nav>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
