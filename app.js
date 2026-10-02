@@ -33,6 +33,8 @@ const ADD_TYPES = [
     { key: "kthim-huase",  tipi: "Kthim i Huasë", lbl: "💳 Kthim i Huasë" }
 ];
 
+const PARTNER_INVEST = { Nexha: "Toyota", Gresa: "Mercedes" };
+
 const TABS = {
     paneli:  { t: "Paneli",        s: "Pasqyra financiare",  ic: "📊" },
     trans:   { t: "Transaksionet", s: "Të gjitha lëvizjet",  ic: "📄" },
@@ -48,7 +50,9 @@ const VIEWS = {
     pasqyraFin:    { t: "Pasqyra Financiare", s: "Raporti financiar" },
     pasqyraOrtaku: { t: "Pasqyra e Ortakut",  s: "" },
     kategorite:    { t: "Menaxho Kategoritë", s: "Shpenzimet",    ic: "🗂️" },
-    historiku:     { t: "Historiku",          s: "Ndryshimet e fundit", ic: "🕘" }
+    historiku:     { t: "Historiku",          s: "Ndryshimet e fundit", ic: "🕘" },
+    typeDetail:    { t: "Detajet",            s: "",               ic: "📄" },
+    fitimiView:    { t: "Fitimi Neto",        s: "",               ic: "📈" }
 };
 
 function friendlyError(e) {
@@ -149,19 +153,21 @@ function partnerRow(name, val, sub) {
 }
 
 function rPaneli(st) {
+    const ccard = (lbl, val, color, fn) => `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit" onclick="${fn}">
+        <div class="lbl">${lbl}</div><div class="val" style="color:${color}">${fmt(val)} MKD</div></button>`;
     let h = `<div class="sec-title">📅 Periudha: ${esc(S.year || "Të gjitha vitet")}</div><div class="grid2">`;
-    h += card("SHITJET", st.shitje, st.shitje >= 0 ? "var(--green-d)" : "var(--red)");
-    h += card("TË ARDHURA NGA DEPOZITI BANKAR", st.teArdhura, "var(--green-d)");
-    h += card("SHPENZIMET", st.shpenzime, "var(--red)");
-    h += card("FITIMI NETO", st.fitimi, st.fitimi >= 0 ? "var(--green-d)" : "var(--red)");
+    h += ccard("SHITJET", st.shitje, st.shitje >= 0 ? "var(--green-d)" : "var(--red)", "App.openTypeView('Shitje')");
+    h += ccard("TË ARDHURA NGA DEPOZITI BANKAR", st.teArdhura, "var(--green-d)", "App.openTypeView('Të Ardhura')");
+    h += ccard("SHPENZIMET", st.shpenzime, "var(--red)", "App.openTypeView('Shpenzim')");
+    h += ccard("FITIMI NETO", st.fitimi, st.fitimi >= 0 ? "var(--green-d)" : "var(--red)", "App.openView('fitimiView')");
     h += `</div><div class="sec-title">👥 GJENDJA E ORTAKËVE</div>`;
     h += partnerRow("Nexha", st.pN, "50% partneritet — kliko për pasqyrën");
     h += partnerRow("Gresa", st.pG, "50% partneritet — kliko për pasqyrën");
     h += `<div class="sec-title">💼 TËRHEQJET & INVESTIMET</div><div class="grid2">`;
-    h += card("TËRHEQJET NEXHA", st.thN, "var(--purple)");
-    h += card("TËRHEQJET GRESA", st.thG, "var(--purple)");
-    h += card("INVESTIMI NEXHA", st.inN, "var(--blue)");
-    h += card("INVESTIMI GRESA", st.inG, "var(--blue)");
+    h += ccard("TËRHEQJET NEXHA", st.thN, "var(--purple)", "App.openTypeView('Tërheqje', 'Nexha')");
+    h += ccard("TËRHEQJET GRESA", st.thG, "var(--purple)", "App.openTypeView('Tërheqje', 'Gresa')");
+    h += ccard("NEXHA KA DHANË PËR TOYOTA", st.inN, "var(--blue)", "App.openTypeView('Investim', 'Nexha')");
+    h += ccard("GRESA KA DHANË PËR MERCEDES", st.inG, "var(--blue)", "App.openTypeView('Investim', 'Gresa')");
     h += `</div><div class="chart-card"><h3>Hyrje vs Dalje</h3><div class="sub">${esc(S.year || "Të gjitha vitet")}</div>
           <div class="chart-box"><canvas id="chart"></canvas></div></div>`;
     return h;
@@ -392,7 +398,7 @@ function rStatement(st) {
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">🏦 50% e Të Ardhurave Bankare</span><b class="pos">${fmt(st.teArdhura / 2)} MKD</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;padding-top:8px;border-top:1px solid var(--line);margin-bottom:6px"><b>📋 Gjithsej i takon ${esc(name)}</b><b class="pos">${fmt(pjesaFitimi)} MKD</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">💸 Tërheqjet e ${esc(name)}</span><b class="neg">−${fmt(th)} MKD</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">💼 + Investimi i ${esc(name)} (kthim)</span><b style="color:var(--blue)">+${fmt(inv)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">💼 Investimi (kthim — ${PARTNER_INVEST[name] || ""})</span><b style="color:var(--blue)">+${fmt(inv)} MKD</b></div>
     </div>`;
     h += `<div class="card" style="background:${pjesa >= 0 ? "#f0fdf6" : "#fdecec"};border-color:${pjesa >= 0 ? "#cdeeda" : "#f5c6c6"}">
         <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">📋 BILANCI FINAL — ${esc(name.toUpperCase())}</div>
@@ -453,6 +459,13 @@ function render() {
     let title = meta.t, sub = meta.s;
     if (S.view === "mujor" && S.viewMonth) { title = S.viewMonth.name; sub = "Detajet e muajit"; }
     if (S.view === "pasqyraOrtaku" && S.viewPartner) { title = "Pasqyra e " + S.viewPartner; sub = "Bilanci final"; }
+    if (S.view === "typeDetail" && S.viewType) {
+        title = S.viewType.partner && S.viewType.tipi === "Tërheqje" ? "Tërheqjet e " + S.viewType.partner
+              : S.viewType.partner && S.viewType.tipi === "Investim" ? "Investimi — " + PARTNER_INVEST[S.viewType.partner]
+              : ({ "Shitje": "Shitjet", "Të Ardhura": "Të Ardhura nga Depoziti Bankar", "Shpenzim": "Shpenzimet" }[S.viewType.tipi] || S.viewType.tipi);
+        sub = S.year || "Të gjitha vitet";
+    }
+    if (S.view === "fitimiView") { title = "Fitimi Neto"; sub = S.year || "Të gjitha vitet"; }
     document.getElementById("hd-title").textContent = title;
     document.getElementById("hd-sub").textContent = sub;
     document.getElementById("year-select").style.display = (!inView && S.tab === "menu") ? "none" : "";
@@ -466,6 +479,8 @@ function render() {
     else if (S.view === "pasqyraOrtaku") html = rStatement(st);
     else if (S.view === "kategorite") html = rKategorite();
     else if (S.view === "historiku") html = rHistoriku();
+    else if (S.view === "typeDetail") html = rTypeDetail(st);
+    else if (S.view === "fitimiView") html = rFitimi(st);
     else if (S.tab === "paneli") html = rPaneli(st);
     else if (S.tab === "trans") html = rTrans();
     else if (S.tab === "raporte") html = rRaporte();
@@ -524,6 +539,32 @@ async function saveCategories() {
     render();
 }
 
+function rTypeDetail(st) {
+    const vt = S.viewType;
+    const ts = st.ts.filter(t => t.tipi === vt.tipi && (!vt.partner || t.kategoria === vt.partner));
+    const total = ts.reduce((s, t) => s + t.shuma, 0);
+    let h = `<div class="card" style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted)">TOTALI</div>
+        <div style="font-size:20px;font-weight:800" class="${total >= 0 ? "pos" : "neg"}">${fmt(total)} MKD</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${ts.length} transaksione</div>
+    </div>`;
+    h += `<button class="load-more" onclick="App.exportTypeDetail()">📄 Eksporto në Excel (CSV)</button>`;
+    h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione për këtë periudhë.</div>`;
+    return h;
+}
+
+function rFitimi(st) {
+    let h = `<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:8px"><span style="color:var(--muted)">💰 Shitjet</span><b class="pos">${fmt(st.shitje)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:8px"><span style="color:var(--muted)">🔋 − Shpenzimet</span><b class="neg">${fmt(st.shpenzime)} MKD</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:15px;padding-top:10px;border-top:2px solid var(--line)"><b>📈 Fitimi Neto</b><b class="${st.fitimi >= 0 ? "pos" : "neg"}">${fmt(st.fitimi)} MKD</b></div>
+    </div>`;
+    const komponentet = st.ts.filter(t => t.tipi === "Shitje" || t.tipi === "Shpenzim");
+    h += `<div class="sec-title">📄 TRANSAKSIONET QË E PËRBEJNË</div>`;
+    h += komponentet.length ? komponentet.map(txCard).join("") : `<div class="empty">Nuk ka transaksione.</div>`;
+    return h;
+}
+
 // ============================================================ App — veprimet
 const App = {
     state: S,  // qasje për debug/testim
@@ -562,6 +603,24 @@ const App = {
         S.view = "mujor"; render(); window.scrollTo(0, 0);
     },
     openStatement(name) { this.pushView(); S.viewPartner = name; S.view = "pasqyraOrtaku"; render(); window.scrollTo(0, 0); },
+    openTypeView(tipi, partner) {
+        this.pushView();
+        S.viewType = { tipi, partner: partner || null };
+        S.view = "typeDetail"; render(); window.scrollTo(0, 0);
+    },
+    exportTypeDetail() {
+        const vt = S.viewType;
+        const ts = stats(S.year).ts.filter(t => t.tipi === vt.tipi && (!vt.partner || t.kategoria === vt.partner));
+        const total = ts.reduce((s, t) => s + t.shuma, 0);
+        const label = vt.partner && vt.tipi === "Tërheqje" ? "Terheqjet_e_" + vt.partner
+            : vt.partner ? "Investimi_" + vt.partner : vt.tipi.replace(" ", "_");
+        const rows = [["SunEnergy Pro — " + label + " (" + (S.year || "Te gjitha vitet") + ")"], [],
+            ["Totali", fmt(total) + " MKD"], ["Numri", ts.length], [],
+            ["Data", "Tipi", "Përshkrimi", "Kategoria", "Shuma"]];
+        ts.forEach(t => rows.push([t.data, t.tipi, t.pershkrimi, t.kategoria, fmt(t.shuma) + " MKD"]));
+        downloadCsv("SunEnergy_" + label + ".csv", rows);
+        UI.toast("📥 CSV u shkarkua");
+    },
 
     exportMonth() {
         const mo = S.viewMonth; if (!mo) return;
