@@ -835,7 +835,11 @@ if (DEMO) {
             .then(() => loadCategories().then(c => {
                 try { const ls = JSON.parse(localStorage.getItem("sep_kategorite") || "null"); if (Array.isArray(ls) && ls.length) S.categories = ls; } catch (e) {}
                 if (Array.isArray(c) && c.length) S.categories = c;
+                // nëse s'ka kategori të ruajtura kudo — mbushi automatikisht me listën bazë
+                let seeded = false;
+                if (!S.categories.length) { S.categories = [...CATEGORIES]; seeded = true; }
                 try { localStorage.setItem("sep_kategorite", JSON.stringify(S.categories)); } catch (e) {}
+                if (seeded) saveCategoriesFirestore(S.categories).catch(() => {});
             })).catch(e => console.warn("kategorite:", e))
             .finally(() => { S.loading = false; render(); });
         } else {
