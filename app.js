@@ -4,7 +4,7 @@
 //   Fitimi Neto = Shitje − Shpenzime
 //   Pjesa e ortakut = 50% Fitimi Neto + 50% Të Ardhura − Tërheqje + Investim
 // ============================================================
-import { onAuth, login, logout, loadAll, saveTx, removeTx, DEMO, USE_TEST_DATA, COLLECTION_TX } from "./firebase.js";
+import { onAuth, login, logout, loadAll, saveTx, removeTx, loadCategories, saveCategoriesFirestore, DEMO, USE_TEST_DATA, COLLECTION_TX } from "./firebase.js";
 
 const CATEGORIES = ["Mirembajtja e Llogarise", "Harxhim per rryme", "Akontacion", "Tatim TVSH", "Provizion per kredi",
     "Kesti per kredi", "Rroga per puntore", "Rroga Zudi", "Kontabilitet", "Sigurimi i objektit", "Telekom internet",
@@ -46,7 +46,9 @@ const VIEWS = {
     mujor:         { t: "Detaje mujore",      s: "" },
     raporteVjetor: { t: "Raporti Vjetor",     s: "Përmbledhja e vitit" },
     pasqyraFin:    { t: "Pasqyra Financiare", s: "Raporti financiar" },
-    pasqyraOrtaku: { t: "Pasqyra e Ortakut",  s: "" }
+    pasqyraOrtaku: { t: "Pasqyra e Ortakut",  s: "" },
+    kategorite:    { t: "Menaxho Kategoritë", s: "Shpenzimet",    ic: "🗂️" },
+    historiku:     { t: "Historiku",          s: "Ndryshimet e fundit", ic: "🕘" }
 };
 
 function friendlyError(e) {
@@ -65,7 +67,8 @@ const isoToDisplay = iso => { const p = iso.split("-"); return p.length === 3 ? 
 const S = {
     user: null, tx: [], tab: "paneli", year: String(new Date().getFullYear()),
     month: "", type: "", search: "", limit: 30, chart: null, loading: false,
-    view: null, viewMonth: null, viewPartner: null, viewStack: []
+    view: null, viewMonth: null, viewPartner: null, viewStack: [],
+    categories: [], log: []
 };
 
 // ============================================================ UI ndihmës
@@ -96,7 +99,7 @@ const UI = {
             <label>${isPartner ? "Arsyeja" : "Përshkrimi"}</label>
             <input type="text" id="f-pershkrimi" value="${esc(v.pershkrimi || "")}" ${tipi === "Shitje" || tipi === "Shpenzim" ? "required" : ""} placeholder="${isPartner ? "p.sh. Kthim i investimit" : "Përshkrim"}">
             ${isExpense ? `<label>Kategoria</label>
-            <select id="f-kategoria">${CATEGORIES.map(k => `<option ${v.kategoria === k ? "selected" : ""}>${esc(k)}</option>`).join("")}</select>` : ""}
+            <select id="f-kategoria">${S.categories.map(k => `<option ${v.kategoria === k ? "selected" : ""}>${esc(k)}</option>`).join("")}</select>` : ""}
             <label>Shuma (MKD)${sign < 0 ? " — do të regjistrohet negative" : ""}</label>
             <input type="number" step="0.01" id="f-shuma" value="${v.shuma ? Math.abs(v.shuma) : ""}" required>`;
         document.getElementById("form-sheet").classList.add("open");
@@ -299,7 +302,10 @@ function rMujorDetail() {
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">FITIMI BRUTO</span><b class="${mo.fitimi >= 0 ? "pos" : "neg"}">${fmt(mo.fitimi)} MKD</b></div>
         <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">TRANSAKSIONE</span><b>${mo.ts.length}</b></div>
     </div>`;
-    h += `<button class="load-more" onclick="App.exportMonth()">📄 Eksporto muajin në Excel (CSV)</button>`;
+    h += `<div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="load-more" style="margin:0" onclick="App.exportMonth()">📄 Excel (CSV)</button>
+        <button class="load-more" style="margin:0;background:var(--blue)" onclick="App.printMonth()">🖨️ Printo</button>
+    </div>`;
     h += mo.ts.length ? mo.ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione këtë muaj.</div>`;
     return h;
 }
@@ -393,7 +399,10 @@ function rStatement(st) {
         <div style="font-size:22px;font-weight:800" class="${fitCls(pjesa)}">${pjesa >= 0 ? "+" : ""}${fmt(pjesa)} MKD</div>
         <div style="font-size:12px;margin-top:4px" class="${fitCls(pjesa)}">${pjesa >= 0 ? "✅ " + name + " ka për të marrë edhe " + fmt(pjesa) + " MKD" : "⚠️ " + name + " ka marrë " + fmt(Math.abs(pjesa)) + " MKD më shumë se fitimi i saj"}</div>
     </div>`;
-    h += `<button class="load-more" onclick="App.exportStatement()">📄 Eksporto pasqyrën në Excel (CSV)</button>`;
+    h += `<div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="load-more" style="margin:0" onclick="App.exportStatement()">📄 Excel (CSV)</button>
+        <button class="load-more" style="margin:0;background:var(--blue)" onclick="App.printStatement()">🖨️ Printo</button>
+    </div>`;
     return h;
 }
 
@@ -415,6 +424,8 @@ function rMenu() {
         ${USE_TEST_DATA ? '<div style="font-size:11px;color:var(--amber);margin-top:6px">⚠️ Fazë testimi — koleksioni: ' + COLLECTION_TX + '</div>' : ""}
     </div>` : "";
     return acc + `<div class="menu-list">` +
+        item("🗂️", "Menaxho Kategoritë", "App.openView('kategorite')") +
+        item("🕘", "Historiku i Ndryshimeve", "App.openView('historiku')") +
         item("💾", "Backup të Dhënave (JSON)", "App.backup()") +
         item("📥", "Importo Backup", "App.importBackup()") +
         item("🔄", "Rifresko të Dhënat", "App.refresh()") +
@@ -453,6 +464,8 @@ function render() {
     else if (S.view === "raporteVjetor") html = rVjetor(st);
     else if (S.view === "pasqyraFin") html = rFinanciar(st);
     else if (S.view === "pasqyraOrtaku") html = rStatement(st);
+    else if (S.view === "kategorite") html = rKategorite();
+    else if (S.view === "historiku") html = rHistoriku();
     else if (S.tab === "paneli") html = rPaneli(st);
     else if (S.tab === "trans") html = rTrans();
     else if (S.tab === "raporte") html = rRaporte();
@@ -460,6 +473,55 @@ function render() {
     document.getElementById("main").innerHTML = html;
     if (S.tab === "trans" && !inView) fillTxList();
     if (S.tab === "paneli" && !inView) drawChart(S.year);
+}
+
+// ============================================================ Kategoritë & Historiku
+function rKategorite() {
+    let h = `<div class="sec-title">🗂️ KATEGORITË E SHPENZIMEVE</div>`;
+    S.categories.forEach((k, i) => {
+        const locked = k === "Te tjera";
+        h += `<div class="card" style="margin-bottom:8px;display:flex;align-items:center;gap:8px;padding:10px 12px">
+            <div style="flex:1;min-width:0;font-size:13.5px;font-weight:700">${esc(k)}</div>
+            <button class="x-btn" style="width:34px;height:34px" onclick="App.catUp(${i})" ${i === 0 ? "disabled" : ""}>↑</button>
+            <button class="x-btn" style="width:34px;height:34px" onclick="App.catDown(${i})" ${i === S.categories.length - 1 ? "disabled" : ""}>↓</button>
+            <button class="x-btn" style="width:34px;height:34px;background:#e8f1ff" onclick="App.catRename(${i})">✏️</button>
+            <button class="x-btn" style="width:34px;height:34px;background:#fdecec" onclick="App.catDelete(${i})" ${locked ? "disabled" : ""}>🗑️</button>
+        </div>`;
+    });
+    h += `<div style="display:flex;gap:8px;margin-top:12px">
+        <input type="text" id="new-cat" placeholder="Kategori e re..." style="flex:1;padding:12px;border:1px solid var(--line);border-radius:12px;font-size:14px;font-family:inherit">
+        <button class="btn-primary" style="width:auto;padding:12px 18px" onclick="App.catAdd()">Shto</button>
+    </div>
+    <p class="note">"Te tjera" mbetet gjithmonë e fundit dhe nuk fshihet.<br>Ndryshimet sinkronizohen me Firebase.</p>`;
+    return h;
+}
+
+function rHistoriku() {
+    let h = `<div class="sec-title">🕘 HISTORIKU I NDRYSHIMEVE</div>`;
+    h += `<button class="load-more" onclick="App.clearLog()">🗑️ Fshi Historikun</button>`;
+    if (!S.log.length) return h + `<div class="empty">Historiku është bosh.</div>`;
+    h += `<div class="menu-list" style="margin-top:10px">` + S.log.map(l =>
+        `<div style="padding:11px 16px;border-bottom:1px solid #f3f4f6">
+            <div style="font-size:13px;font-weight:700">${esc(l.action)}</div>
+            <div style="font-size:11.5px;color:var(--muted)">${esc(l.details)}</div>
+            <div style="font-size:10.5px;color:#9ca3af;margin-top:2px">${esc(l.time)}</div>
+        </div>`).join("") + `</div>`;
+    return h;
+}
+
+function logAdd(action, details) {
+    S.log.unshift({ action, details, time: new Date().toLocaleString("sq-AL") });
+    if (S.log.length > 200) S.log.length = 200;
+    try { localStorage.setItem("sep_log", JSON.stringify(S.log)); } catch (e) {}
+}
+function loadLog() {
+    try { S.log = JSON.parse(localStorage.getItem("sep_log") || "[]"); } catch (e) { S.log = []; }
+}
+async function saveCategories() {
+    try { localStorage.setItem("sep_kategorite", JSON.stringify(S.categories)); } catch (e) {}
+    try { await saveCategoriesFirestore(S.categories); UI.toast("✅ Kategoritë u sinkronizuan"); }
+    catch (e) { UI.toast("⚠️ U ruajtën lokalisht — Firebase: " + e.message, true); }
+    render();
 }
 
 // ============================================================ App — veprimet
@@ -564,8 +626,76 @@ const App = {
         try {
             await removeTx(id);
             S.tx = S.tx.filter(t => String(t.id) !== String(id));
+            logAdd("🗑️ Fshirje", (tx.pershkrimi || tx.tipi) + " (" + fmt(Math.abs(tx.shuma)) + " MKD, " + tx.data + ")");
             render(); UI.toast("🗑️ E fshirë dhe e sinkronizuar");
         } catch (e) { UI.toast("⚠️ Gabim gjatë fshirjes: " + e.message, true); }
+    },
+
+    catUp(i) { if (i <= 0) return; const c = S.categories; [c[i - 1], c[i]] = [c[i], c[i - 1]]; saveCategories(); },
+    catDown(i) { if (i >= S.categories.length - 1) return; const c = S.categories; [c[i + 1], c[i]] = [c[i], c[i + 1]]; saveCategories(); },
+    async catRename(i) {
+        const old = S.categories[i];
+        const n = prompt("Emri i ri i kategorisë:", old);
+        if (!n || n.trim() === old) return;
+        S.categories[i] = n.trim();
+        let used = 0;
+        S.tx.forEach(t => { if (t.kategoria === old) { t.kategoria = n.trim(); used++; } });
+        await saveCategories();
+        if (used) { logAdd("✏️ Kategoria u riemërtua", old + " → " + n.trim() + " (" + used + " transaksione të përditësuara)"); try { localStorage.setItem("sep_log", JSON.stringify(S.log)); } catch (e) {} }
+        render(); UI.toast("✅ Kategoria u riemërtua");
+    },
+    async catDelete(i) {
+        const k = S.categories[i];
+        if (k === "Te tjera") return;
+        const used = S.tx.filter(t => t.kategoria === k).length;
+        if (!confirm("Ta fshij kategorinë \"" + k + "\"?" + (used ? "\n⚠️ " + used + " transaksione e përdorin — do të mbeten pa kategori." : ""))) return;
+        S.categories.splice(i, 1);
+        await saveCategories();
+        logAdd("🗑️ Kategoria u fshi", k + (used ? " (" + used + " transaksione pa kategori)" : ""));
+        try { localStorage.setItem("sep_log", JSON.stringify(S.log)); } catch (e) {}
+        render(); UI.toast("✅ Kategoria u fshi");
+    },
+    async catAdd() {
+        const inp = document.getElementById("new-cat");
+        const k = (inp.value || "").trim();
+        if (!k) { UI.toast("⚠️ Shkruaj emrin e kategorisë", true); return; }
+        if (S.categories.includes(k)) { UI.toast("⚠️ Kjo kategori ekziston", true); return; }
+        S.categories.splice(S.categories.length - 1, 0, k);
+        await saveCategories();
+        logAdd("➕ Kategori e re", k);
+        try { localStorage.setItem("sep_log", JSON.stringify(S.log)); } catch (e) {}
+        render();
+    },
+    clearLog() {
+        if (!confirm("Ta fshij gjithë historikun?")) return;
+        S.log = []; try { localStorage.setItem("sep_log", "[]"); } catch (e) {}
+        render();
+    },
+    printMonth() {
+        const mo = S.viewMonth; if (!mo) return;
+        const rows = mo.ts.map(t => "<tr><td>" + esc(t.data) + "</td><td>" + esc(t.tipi) + "</td><td>" + esc(t.pershkrimi) + "</td><td>" + esc(t.kategoria || "-") + "</td><td style=\"text-align:right\">" + fmt(t.shuma) + " MKD</td></tr>");
+        printReport("Raporti Mujor — " + mo.name, [
+            ["Totali i Shitjeve", fmt(mo.shitje) + " MKD"],
+            ["Totali i Shpenzimeve", fmt(mo.shpenzime) + " MKD"],
+            ["Fitimi Bruto", fmt(mo.fitimi) + " MKD"]
+        ], ["Data", "Tipi", "Përshkrimi", "Kategoria", "Shuma"], rows);
+    },
+    printStatement() {
+        const st = stats(S.year), name = S.viewPartner;
+        const th = name === "Nexha" ? st.thN : st.thG;
+        const inv = name === "Nexha" ? st.inN : st.inG;
+        const pjesa = name === "Nexha" ? st.pN : st.pG;
+        printReport("Pasqyra e Ortakut — " + name + " (" + (S.year || "Të gjitha vitet") + ")", [
+            ["Shitja e Rrymës", fmt(st.shitje) + " MKD"],
+            ["Shpenzimet Operative", "-" + fmt(st.shpenzime) + " MKD"],
+            ["Fitimi Neto Operativ", fmt(st.fitimi) + " MKD"],
+            ["Të Ardhura nga Depoziti Bankar", fmt(st.teArdhura) + " MKD"],
+            ["50% e Fitimit Neto", fmt(st.fitimi / 2) + " MKD"],
+            ["50% e Të Ardhurave Bankare", fmt(st.teArdhura / 2) + " MKD"],
+            ["Tërheqjet e " + name, "-" + fmt(th) + " MKD"],
+            ["Investimi i " + name + " (kthim)", "+" + fmt(inv) + " MKD"],
+            ["BILANCI FINAL", fmt(pjesa) + " MKD"]
+        ], [], []);
     },
 
     async saveTx(ev) {
@@ -595,7 +725,8 @@ const App = {
             const i = S.tx.findIndex(t => String(t.id) === String(tx.id));
             if (i >= 0) S.tx[i] = tx; else S.tx.push(tx);
             UI.closeForm(); render();
-            UI.toast(id ? "✅ U përditësua dhe u sinkronizua" : "✅ U shtua dhe u sinkronizua me Firebase");
+            logAdd(id ? "✏️ Editim" : "➕ Shtim", tipi + " — " + (tx.pershkrimi || tipi) + " (" + fmt(Math.abs(tx.shuma)) + " MKD, " + tx.data + ")");
+            UI.toast(id ? "✅ U përditësua dhe u sinkronizua me Firebase" : "✅ U shtua dhe u sinkronizua me Firebase");
         } catch (e) {
             UI.toast("⚠️ Gabim në sinkronizim: " + e.message, true);
         }
@@ -648,6 +779,25 @@ const App = {
 };
 window.App = App;
 
+function printReport(title, summaryPairs, headers, rows) {
+    const w = window.open("", "_blank");
+    if (!w) { UI.toast("⚠️ Lejo pop-up për të printuar", true); return; }
+    const sumHtml = summaryPairs.map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee"><span>${k}</span><b>${v}</b></div>`).join("");
+    const head = headers.length ? "<thead><tr>" + headers.map(h => `<th style="text-align:left;padding:10px;background:#f2f2f2">${h}</th>`).join("") + "</tr></thead>" : "";
+    const body = rows.length ? "<tbody>" + rows.join("") + "</tbody>" : "";
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+        <style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;padding:30px;color:#1f2937}
+        h1{font-size:20px}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+        td{padding:8px 6px;border-bottom:1px solid #eee}</style></head>
+        <body><h1>⚡ SunEnergy Pro</h1><h2 style="font-size:16px;font-weight:600">${title}</h2>
+        <div style="margin:16px 0">${sumHtml}</div>
+        ${head}${body}
+        <p style="margin-top:24px;font-size:11px;color:#9ca3af">Nexha &amp; Gresa — ${new Date().toLocaleString("sq-AL")}</p>
+        </body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 400);
+}
+
 // ============================================================ Nisja
 function showApp() {
     document.getElementById("screen-login").classList.add("hidden");
@@ -670,7 +820,9 @@ if (DEMO) {
         demo.push({ id: "demo" + i, data: `1${i % 9}-${m}-${y}`, tipi: tips[i % 5], pershkrimi: "Transaksion demo " + (i + 1), kategoria: kat[i % 5], shuma: i % 5 === 1 ? (Math.round(Math.random() * 800000) + 100000) : -(Math.round(Math.random() * 60000) + 500), timestamp: "" });
     }
     S.tx = demo;
+    S.categories = [...CATEGORIES];
     S.user = { email: "demo@sunenergy.app" };
+    loadLog();
     showApp();
 } else {
     onAuth(user => {
@@ -678,7 +830,14 @@ if (DEMO) {
             S.user = user;
             showApp();
             S.loading = true;
-            loadAll().then(list => { S.tx = list; }).catch(e => UI.toast("⚠️ " + friendlyError(e), true)).finally(() => { S.loading = false; render(); });
+            loadLog();
+            loadAll().then(list => { S.tx = list; }).catch(e => UI.toast("⚠️ " + friendlyError(e), true))
+            .then(() => loadCategories().then(c => {
+                try { const ls = JSON.parse(localStorage.getItem("sep_kategorite") || "null"); if (Array.isArray(ls) && ls.length) S.categories = ls; } catch (e) {}
+                if (Array.isArray(c) && c.length) S.categories = c;
+                try { localStorage.setItem("sep_kategorite", JSON.stringify(S.categories)); } catch (e) {}
+            })).catch(e => console.warn("kategorite:", e))
+            .finally(() => { S.loading = false; render(); });
         } else {
             S.user = null; S.tx = [];
             showLogin();

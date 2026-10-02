@@ -9,7 +9,7 @@
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCkswebpHfdpECbsem_uqkIdtockv6I3Es",
@@ -68,6 +68,18 @@ export async function saveTx(tx) {
 export async function removeTx(id) {
     if (DEMO) return true;
     await deleteDoc(doc(db, COLLECTION_TX, String(id)));
+    return true;
+}
+
+// Kategoritë e shpenzimeve — një dokument i vetëm: kategorite/shpenzimet
+export async function loadCategories() {
+    if (DEMO) return null;
+    const d = await getDoc(doc(db, "kategorite", "shpenzimet"));
+    return d.exists() ? (d.data().list || null) : null;
+}
+export async function saveCategoriesFirestore(list) {
+    if (DEMO) return true;
+    await setDoc(doc(db, "kategorite", "shpenzimet"), { list });
     return true;
 }
 
