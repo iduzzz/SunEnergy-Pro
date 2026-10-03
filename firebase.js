@@ -8,6 +8,7 @@
 //   duke ndryshuar USE_TEST_DATA në false — dhe vetëm pas backup-it.
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, collection, getDocs, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -28,6 +29,22 @@ export const COLLECTION_TX = USE_TEST_DATA ? "transaksionet_test" : "transaksion
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// ============================================================
+// FIREBASE APP CHECK — mbrojtje shtesë kundër trafikut jashtë aplikacioneve tuaja.
+// Për ta aktivizuar: (1) krijoni një çelës reCAPTCHA v3 në Google Cloud me
+//     domenat: sunenergypro.vercel.app + localhost
+// (2) regjistrojeni te Firebase Console → App Check → Apps
+// (3) ngjitni çelësin e faqes më poshtë (SITE_KEY) dhe bëni deploy
+// Derisa SITE_KEY është bosh, App Check nuk aktivizohet dhe asgjë s'preket.
+// ============================================================
+const APPCHECK_SITE_KEY = "";
+if (APPCHECK_SITE_KEY) {
+    initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(APPCHECK_SITE_KEY),
+        isTokenAutoRefreshEnabled: true
+    });
+}
 
 // Demo mode (?demo=1): vetëm për testim vizual — pa Firebase, pa shkrim
 export const DEMO = new URLSearchParams(location.search).get("demo") === "1";

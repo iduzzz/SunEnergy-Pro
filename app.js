@@ -428,6 +428,7 @@ function rMenu() {
         <div style="font-size:14px;font-weight:700;margin-top:4px">${esc(S.user.email || "llogari pa email")}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all">UID: ${esc(S.user.uid || "")}</div>
         ${USE_TEST_DATA ? '<div style="font-size:11px;color:var(--amber);margin-top:6px">⚠️ Fazë testimi — koleksioni: ' + COLLECTION_TX + '</div>' : ""}
+        ${localStorage.getItem("sep_last_auto_backup") ? '<div style="font-size:11px;color:var(--muted);margin-top:6px">💾 Backup automatik: ' + esc(localStorage.getItem("sep_last_auto_backup")) + '</div>' : ""}
     </div>` : "";
     return acc + `<div class="menu-list">` +
         item("🗂️", "Menaxho Kategoritë", "App.openView('kategorite')") +
@@ -857,6 +858,25 @@ function printReport(title, summaryPairs, headers, rows) {
     setTimeout(() => w.print(), 400);
 }
 
+// ============================================================ Auto-backup i përditshëm (lokal)
+function autoBackupDaily() {
+    const today = new Date().toISOString().split("T")[0];
+    if (localStorage.getItem("sep_last_auto_backup") === today) return;
+    if (!S.tx.length) return;
+    try {
+        localStorage.setItem("sep_auto_backup_" + today, JSON.stringify({
+            version: "pro-1.0", timestamp: new Date().toISOString(), data: S.tx
+        }));
+        localStorage.setItem("sep_last_auto_backup", today);
+        // mbaj vetëm 7 ditët e fundit
+        Object.keys(localStorage).filter(k => k.startsWith("sep_auto_backup_")).forEach(k => {
+            const d = k.replace("sep_auto_backup_", "");
+            if ((new Date() - new Date(d)) / 86400000 > 7) localStorage.removeItem(k);
+        });
+        UI.toast("💾 Backup automatik u ruajt (lokal)");
+    } catch (e) {}
+}
+
 // ============================================================ Nisja
 function showApp() {
     document.getElementById("screen-login").classList.add("hidden");
@@ -900,7 +920,7 @@ if (DEMO) {
                 try { localStorage.setItem("sep_kategorite", JSON.stringify(S.categories)); } catch (e) {}
                 if (seeded) saveCategoriesFirestore(S.categories).catch(() => {});
             })).catch(e => console.warn("kategorite:", e))
-            .finally(() => { S.loading = false; render(); });
+            .finally(() => { S.loading = false; render(); autoBackupDaily(); });
         } else {
             S.user = null; S.tx = [];
             showLogin();
