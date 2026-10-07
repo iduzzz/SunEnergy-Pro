@@ -348,13 +348,14 @@ function rVjetor(st) {
 
 // përmbledhje mujore për një tip (investim/tërheqje) + ortak opsional
 function summaryList(kind, partner) {
+    const tipi = kind === "terheqje" ? "Tërheqje" : "Investim";
     const arr = [];
     for (let m = 1; m <= 12; m++) {
         const mm = String(m).padStart(2, "0");
         const ts = S.tx.filter(t => {
             const p = String(t.data || "").split("-");
             return p.length === 3 && (!S.year || p[2] === S.year) && p[1] === mm
-                && t.tipi === kind && (!partner || t.kategoria === partner);
+                && t.tipi === tipi && (!partner || t.kategoria === partner);
         });
         arr.push({ m: mm, name: MONTHS[m - 1], ts, total: ts.reduce((s, t) => s + Math.abs(t.shuma), 0) });
     }
@@ -424,6 +425,15 @@ function rFinanciar(st) {
     h += ccard("TË ARDHURA NGA DEPOZITI", st.teArdhura, "var(--blue)", "App.openTypeView('Të Ardhura')");
     h += `</div>`;
     h += `<button class="load-more" onclick="App.exportFinanciar()">📄 Eksporto në Excel (CSV)</button>`;
+    h += `<div class="sec-title">👥 TËRHEQJET & INVESTIMET SIPAS ORTAKËVE</div>`;
+    const ort = (ic, lbl, sub, val, cls, fn) => `<button class="row-card" onclick="${fn}">
+        <div class="row-ic" style="background:#f3e8ff">${ic}</div>
+        <div class="row-tx"><b>${lbl}</b><span>${sub} — kliko për mujore</span></div>
+        <div class="row-val ${cls}">${val} MKD</div></button>`;
+    h += ort("💸", "Tërheqjet e Nexha", "Muj-për-muaj", fmt(st.thN), "neg", "App.openSummary('terheqje', 'Nexha')");
+    h += ort("💸", "Tërheqjet e Gresa", "Muj-për-muaj", fmt(st.thG), "neg", "App.openSummary('terheqje', 'Gresa')");
+    h += ort("💼", "Nexha ka dhanë për Toyota", "Investimi — muj-për-muaj", fmt(st.inN), "pos", "App.openSummary('investim', 'Nexha')");
+    h += ort("💼", "Gresa ka dhanë për Mercedes", "Investimi — muj-për-muaj", fmt(st.inG), "pos", "App.openSummary('investim', 'Gresa')");
     h += `<div class="sec-title">📂 HARXHIMET SIPAS KATEGORIVE</div>`;
     if (!katList.length) h += `<div class="empty">Nuk ka harxhime për këtë periudhë.</div>`;
     katList.forEach(([k, v]) => {
