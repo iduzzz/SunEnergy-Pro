@@ -56,6 +56,8 @@ const VIEWS = {
     summary:       { t: "Përmbledhje",        s: "",               ic: "📋" },
     summaryMonth:  { t: "Përmbledhje mujore", s: "",               ic: "📅" },
     katMonth:      { t: "Kategoria",          s: "",               ic: "📂" },
+    typeYear:      { t: "Detajet",            s: "",               ic: "📅" },
+    katYear:       { t: "Kategoria",          s: "",               ic: "📅" },
     fitimiView:    { t: "Fitimi Neto",        s: "",               ic: "📈" }
 };
 
@@ -77,7 +79,7 @@ const S = {
     month: "", type: "", search: "", limit: 30, chart: null, loading: false,
     view: null, viewMonth: null, viewPartner: null, viewStack: [],
     viewSummary: null, viewSummaryMonth: null,
-    viewKatMonth: null,
+    viewKatMonth: null, viewTypeYear: null, viewKatYear: null,
     categories: [], log: []
 };
 
@@ -366,17 +368,7 @@ function rVjetor(st) {
     h += ccard("TËRHEQJET", st.thN + st.thG, "var(--purple)", "App.openSummary('terheqje')");
     h += `</div>`;
     h += `<button class="load-more" onclick="App.exportVjetor()">📄 Eksporto në Excel (CSV)</button>`;
-    const months = monthData(S.year);
-    h += `<div class="sec-title">📅 ANALIZA MUJORE — kliko një muaj për detaje</div>`;
-    months.forEach(mo => {
-        const fitCls = mo.fitimi >= 0 ? "pos" : "neg";
-        h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:10px" onclick="App.openMonth('${mo.m}')">
-            <div style="font-size:13px;font-weight:800;margin-bottom:6px">${esc(mo.name)}</div>
-            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Shitje:</span><b class="pos">${fmt(mo.shitje)} MKD</b></div>
-            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Shpenzime:</span><b class="neg">${fmt(mo.shpenzime)} MKD</b></div>
-            <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="color:var(--muted)">Fitimi:</span><b class="${fitCls}">${fmt(mo.fitimi)} MKD</b></div>
-        </button>`;
-    });
+    h += `<p class="note">📅 Analiza mujore e gjen te: Raporte → Raporte Mujore</p>`;
     return h;
 }
 
@@ -585,6 +577,14 @@ function render() {
     if (S.view === "fitimiView") { title = "Fitimi Neto"; sub = S.year || "Të gjitha vitet"; }
     if (S.view === "katDetail" && S.viewKat) { title = S.viewKat; sub = "Harxhimet e kategorisë — " + (S.year || "Të gjitha vitet"); }
     if (S.view === "katMonth" && S.viewKatMonth) { title = S.viewKatMonth.kat; sub = "Harxhimet — " + S.viewKatMonth.monthName; }
+    if (S.view === "typeYear" && S.viewTypeYear) {
+        const vt = S.viewTypeYear;
+        title = vt.partner && vt.tipi === "Tërheqje" ? "Tërheqjet e " + vt.partner + " — " + vt.year
+              : vt.partner && vt.tipi === "Investim" ? "Investimi — " + PARTNER_INVEST[vt.partner] + " — " + vt.year
+              : ({ "Shitje": "Shitjet", "Të Ardhura": "Të Ardhura nga Depoziti Bankar", "Shpenzim": "Shpenzimet" }[vt.tipi] || vt.tipi) + " — " + vt.year;
+        sub = vt.year;
+    }
+    if (S.view === "katYear" && S.viewKatYear) { title = S.viewKatYear.kat; sub = "Harxhimet — " + S.viewKatYear.year; }
     if ((S.view === "summary" || S.view === "summaryMonth") && S.viewSummary) {
         const { kind, partner } = S.viewSummary;
         title = kind === "terheqje" ? (partner ? "Tërheqjet e " + partner : "Tërheqjet") : (partner ? "Investimi — " + PARTNER_INVEST[partner] : "Investimet");
@@ -609,6 +609,8 @@ function render() {
     else if (S.view === "summary") html = rSummary();
     else if (S.view === "summaryMonth") html = rSummaryMonth();
     else if (S.view === "katMonth") html = rKatMonth();
+    else if (S.view === "typeYear") html = rTypeYear();
+    else if (S.view === "katYear") html = rKatYear();
     else if (S.view === "fitimiView") html = rFitimi(st);
     else if (S.tab === "paneli") html = rPaneli(st);
     else if (S.tab === "trans") html = rTrans();
@@ -677,8 +679,88 @@ function rTypeDetail(st) {
         <div style="font-size:20px;font-weight:800" class="${total >= 0 ? "pos" : "neg"}">${fmt(total)} MKD</div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${ts.length} transaksione</div>
     </div>`;
+
+    // "Të gjitha vitet": përmbledhje vit-për-vit (klikueshme), pa listë gjigante
+    if (!S.year) {
+        const byYear = {};
+        ts.forEach(t => {
+            const y = String(t.data || "").split("-")[2];
+            if (!byYear[y]) byYear[y] = { sum: 0, count: 0 };
+            byYear[y].sum += t.shuma; byYear[y].count++;
+        });
+        h += `<div class="sec-title">📅 SIPAS VITEVE — kliko për detajet</div>`;
+        Object.keys(byYear).sort().reverse().forEach(y => {
+            const yv = byYear[y];
+            h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openTypeYear('${y}')">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:13px;font-weight:800">📅 ${esc(y)}</div>
+                    <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="${yv.sum >= 0 ? "pos" : "neg"}">${fmt(yv.sum)} MKD</div>
+                    <div style="font-size:11px;color:var(--muted)">${yv.count} transaksione</div></div>
+                </div>
+            </button>`;
+        });
+        if (!Object.keys(byYear).length) h += `<div class="empty">Nuk ka transaksione.</div>`;
+        return h;
+    }
+
+    // vit i vetëm + Shpenzim: përmbledhje sipas kategorive (klikueshme)
+    if (vt.tipi === "Shpenzim" && !vt.partner) {
+        const katMap = {};
+        ts.forEach(t => { const k = t.kategoria || "Te tjera"; katMap[k] = (katMap[k] || 0) + Math.abs(t.shuma); });
+        const katList = Object.entries(katMap).sort((a, b) => b[1] - a[1]);
+        if (katList.length) {
+            h += `<div class="sec-title">📂 SIPAS KATEGORIVE — kliko për detajet</div>`;
+            katList.forEach(([k, v]) => {
+                const escK = esc(k).replace(/'/g, "\\'");
+                h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openKatView('${escK}')">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div style="font-size:13px;font-weight:700">📂 ${esc(k)}</div>
+                        <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="neg">−${fmt(v)} MKD</div>
+                        <div style="font-size:11px;color:var(--muted)">${total > 0 ? ((v / total) * 100).toFixed(1) : "0.0"}% të shpenzimeve</div></div>
+                    </div>
+                </button>`;
+            });
+            h += `<div class="sec-title">📄 TË GJITHA TRANSAKSIONET</div>`;
+        }
+    }
     h += `<button class="load-more" onclick="App.exportTypeDetail()">📄 Eksporto në Excel (CSV)</button>`;
     h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione për këtë periudhë.</div>`;
+    return h;
+}
+
+function rTypeYear() {
+    const vt = S.viewType, ty = S.viewTypeYear;
+    if (!vt || !ty) return "";
+    const ts = S.tx.filter(t =>
+        t.tipi === vt.tipi && (!vt.partner || t.kategoria === vt.partner) &&
+        (() => { const p = String(t.data || "").split("-"); return p.length === 3 && p[2] === ty.year; })());
+    const total = ts.reduce((s, t) => s + t.shuma, 0);
+    ts.sort((a, b) => { const pa = String(a.data || "").split("-"), pb = String(b.data || "").split("-"); return (new Date(pb[2], pb[1] - 1, pb[0]) - new Date(pa[2], pa[1] - 1, pa[0])) || 0; });
+    let h = `<div class="card" style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted)">TOTALI ${esc(ty.year)}</div>
+        <div style="font-size:20px;font-weight:800" class="${total >= 0 ? "pos" : "neg"}">${fmt(total)} MKD</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${ts.length} transaksione</div>
+    </div>`;
+    h += `<button class="load-more" onclick="App.exportTypeYear()">📄 Eksporto në Excel (CSV)</button>`;
+    h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione.</div>`;
+    return h;
+}
+
+function rKatYear() {
+    const ky = S.viewKatYear;
+    if (!ky) return "";
+    const ts = S.tx.filter(t =>
+        t.tipi === "Shpenzim" && (t.kategoria || "Te tjera") === ky.kat &&
+        (() => { const p = String(t.data || "").split("-"); return p.length === 3 && p[2] === ky.year; })());
+    const total = ts.reduce((s, t) => s + Math.abs(t.shuma), 0);
+    ts.sort((a, b) => { const pa = String(a.data || "").split("-"), pb = String(b.data || "").split("-"); return (new Date(pb[2], pb[1] - 1, pb[0]) - new Date(pa[2], pa[1] - 1, pa[0])) || 0; });
+    let h = `<div class="card" style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted)">TOTALI ${esc(ky.year)}</div>
+        <div style="font-size:20px;font-weight:800" class="neg">−${fmt(total)} MKD</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${ts.length} harxhime</div>
+    </div>`;
+    h += `<button class="load-more" onclick="App.exportKatYear()">📄 Eksporto në Excel (CSV)</button>`;
+    h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka harxhime.</div>`;
     return h;
 }
 
@@ -703,6 +785,27 @@ function rKatDetail(st) {
         <div style="font-size:20px;font-weight:800" class="neg">−${fmt(total)} MKD</div>
         <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${ts.length} harxhime</div>
     </div>`;
+    // "Të gjitha vitet": përmbledhje vit-për-vit (klikueshme)
+    if (!S.year) {
+        const byYear = {};
+        ts.forEach(t => {
+            const y = String(t.data || "").split("-")[2];
+            if (!byYear[y]) byYear[y] = { sum: 0, count: 0 };
+            byYear[y].sum += Math.abs(t.shuma); byYear[y].count++;
+        });
+        h += `<div class="sec-title">📅 SIPAS VITEVE — kliko për detajet</div>`;
+        Object.keys(byYear).sort().reverse().forEach(y => {
+            const yv = byYear[y];
+            h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openKatYear('${y}')">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:13px;font-weight:800">📅 ${esc(y)}</div>
+                    <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="neg">−${fmt(yv.sum)} MKD</div>
+                    <div style="font-size:11px;color:var(--muted)">${yv.count} harxhime</div></div>
+                </div>
+            </button>`;
+        });
+        return h;
+    }
     h += `<button class="load-more" onclick="App.exportKatDetail()">📄 Eksporto në Excel (CSV)</button>`;
     h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka harxhime për këtë kategori.</div>`;
     return h;
@@ -712,7 +815,7 @@ function rKatDetail(st) {
 const App = {
     state: S,  // qasje për debug/testim
     go(tab) {
-        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = []; S.viewSummary = null; S.viewSummaryMonth = null; S.viewKatMonth = null;
+        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = []; S.viewSummary = null; S.viewSummaryMonth = null; S.viewKatMonth = null; S.viewTypeYear = null; S.viewKatYear = null;
         UI.closeSheet(); UI.closeForm();
         document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === tab));
         const meta = TABS[tab];
@@ -731,12 +834,16 @@ const App = {
     more() { S.limit += 30; fillTxList(); },
     toggleTx(el) { document.querySelectorAll(".tx-card.open").forEach(c => { if (c !== el) c.classList.remove("open"); }); el.classList.toggle("open"); },
 
-    pushView() { S.viewStack.push({ view: S.view, viewMonth: S.viewMonth, viewPartner: S.viewPartner, tab: S.tab, viewSummary: S.viewSummary, viewSummaryMonth: S.viewSummaryMonth, viewKatMonth: S.viewKatMonth }); },
-    openView(id) { this.pushView(); S.view = id; S.limit = 30; UI.closeSheet(); UI.closeForm(); render(); window.scrollTo(0, 0); },
+    pushView() { S.viewStack.push({ view: S.view, viewMonth: S.viewMonth, viewPartner: S.viewPartner, tab: S.tab, viewSummary: S.viewSummary, viewSummaryMonth: S.viewSummaryMonth, viewKatMonth: S.viewKatMonth, viewTypeYear: S.viewTypeYear, viewKatYear: S.viewKatYear }); },
+    openView(id) {
+        if (id === "raporteMujore" && !S.year) S.year = String(new Date().getFullYear());
+        this.pushView(); S.view = id; S.limit = 30; UI.closeSheet(); UI.closeForm(); render(); window.scrollTo(0, 0);
+    },
     back() {
-        const prev = S.viewStack.pop() || { view: null, viewMonth: null, viewPartner: null, tab: S.tab, viewSummary: null, viewSummaryMonth: null, viewKatMonth: null };
+        const prev = S.viewStack.pop() || { view: null, viewMonth: null, viewPartner: null, tab: S.tab, viewSummary: null, viewSummaryMonth: null, viewKatMonth: null, viewTypeYear: null, viewKatYear: null };
         S.view = prev.view; S.viewMonth = prev.viewMonth; S.viewPartner = prev.viewPartner; S.tab = prev.tab;
         S.viewSummary = prev.viewSummary; S.viewSummaryMonth = prev.viewSummaryMonth; S.viewKatMonth = prev.viewKatMonth;
+        S.viewTypeYear = prev.viewTypeYear; S.viewKatYear = prev.viewKatYear;
         document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === S.tab));
         render(); window.scrollTo(0, 0);
     },
@@ -796,6 +903,42 @@ const App = {
             ["Data", "Përshkrimi", "Shuma"]];
         vm.ts.forEach(t => rows.push([t.data, t.pershkrimi, "-" + fmt(Math.abs(t.shuma)) + " MKD"]));
         downloadCsv("SunEnergy_" + vm.kat.replace(/[^a-zA-Z0-9]/g, "_") + "_" + vm.monthName.replace(/\s/g, "_") + ".csv", rows);
+        UI.toast("📥 CSV u shkarkua");
+    },
+    openTypeYear(y) {
+        this.pushView();
+        S.viewTypeYear = { ...S.viewType, year: y };
+        S.view = "typeYear"; render(); window.scrollTo(0, 0);
+    },
+    openKatYear(y) {
+        this.pushView();
+        S.viewKatYear = { kat: S.viewKat, year: y };
+        S.view = "katYear"; render(); window.scrollTo(0, 0);
+    },
+    exportTypeYear() {
+        const vt = S.viewType, ty = S.viewTypeYear;
+        const ts = S.tx.filter(t =>
+            t.tipi === vt.tipi && (!vt.partner || t.kategoria === vt.partner) &&
+            (() => { const p = String(t.data || "").split("-"); return p.length === 3 && p[2] === ty.year; })());
+        const total = ts.reduce((s, t) => s + t.shuma, 0);
+        const label = vt.partner && vt.tipi === "Tërheqje" ? "Terheqjet_e_" + vt.partner : vt.partner ? "Investimi_" + vt.partner : vt.tipi.replace(" ", "_");
+        const rows = [["SunEnergy Pro — " + label + " " + ty.year], [], ["Totali", fmt(total) + " MKD"], ["Numri", ts.length], [],
+            ["Data", "Tipi", "Përshkrimi", "Kategoria", "Shuma"]];
+        ts.forEach(t => rows.push([t.data, t.tipi, t.pershkrimi, t.kategoria, fmt(t.shuma) + " MKD"]));
+        downloadCsv("SunEnergy_" + label + "_" + ty.year + ".csv", rows);
+        UI.toast("📥 CSV u shkarkua");
+    },
+    exportKatYear() {
+        const ky = S.viewKatYear;
+        const ts = S.tx.filter(t =>
+            t.tipi === "Shpenzim" && (t.kategoria || "Te tjera") === ky.kat &&
+            (() => { const p = String(t.data || "").split("-"); return p.length === 3 && p[2] === ky.year; })());
+        const total = ts.reduce((s, t) => s + Math.abs(t.shuma), 0);
+        const rows = [["SunEnergy Pro — " + ky.kat + " (" + ky.year + ")"], [],
+            ["Totali", "-" + fmt(total) + " MKD"], ["Numri", ts.length], [],
+            ["Data", "Përshkrimi", "Shuma"]];
+        ts.forEach(t => rows.push([t.data, t.pershkrimi, "-" + fmt(Math.abs(t.shuma)) + " MKD"]));
+        downloadCsv("SunEnergy_" + ky.kat.replace(/[^a-zA-Z0-9]/g, "_") + "_" + ky.year + ".csv", rows);
         UI.toast("📥 CSV u shkarkua");
     },
     openKatView(k) {
