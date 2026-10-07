@@ -9,7 +9,7 @@
 // ============================================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check.js";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getFirestore, collection, getDocs, doc, getDoc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -52,6 +52,7 @@ export const DEMO = new URLSearchParams(location.search).get("demo") === "1";
 export function onAuth(cb) { onAuthStateChanged(auth, cb); }
 export async function login(email, password) { return signInWithEmailAndPassword(auth, email, password); }
 export async function logout() { return signOut(auth); }
+export async function sendReset(email) { return sendPasswordResetEmail(auth, email); }
 
 function docId() { return "txn_" + Date.now() + "_" + Math.random().toString(36).slice(2, 11); }
 

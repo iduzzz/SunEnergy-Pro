@@ -4,7 +4,7 @@
 //   Fitimi Neto = Shitje − Shpenzime
 //   Pjesa e ortakut = 50% Fitimi Neto + 50% Të Ardhura − Tërheqje + Investim
 // ============================================================
-import { onAuth, login, logout, loadAll, saveTx, removeTx, loadCategories, saveCategoriesFirestore, DEMO, USE_TEST_DATA, COLLECTION_TX } from "./firebase.js";
+import { onAuth, login, logout, sendReset, loadAll, saveTx, removeTx, loadCategories, saveCategoriesFirestore, DEMO, USE_TEST_DATA, COLLECTION_TX } from "./firebase.js";
 
 const CATEGORIES = ["Mirembajtja e Llogarise", "Harxhim per rryme", "Akontacion", "Tatim TVSH", "Provizion per kredi",
     "Kesti per kredi", "Rroga per puntore", "Rroga Zudi", "Kontabilitet", "Sigurimi i objektit", "Telekom internet",
@@ -943,4 +943,21 @@ document.getElementById("login-form").addEventListener("submit", async ev => {
         err.textContent = "⚠️ " + (map[e.code] || "Hyrja dështoi: " + e.message);
     }
     btn.disabled = false; btn.textContent = "Hyr";
+});
+
+document.getElementById("forgot-btn").addEventListener("click", async () => {
+    const email = (document.getElementById("login-email").value || prompt("Shkruaj email-in tënd:")).trim();
+    if (!email) return;
+    const btn = document.getElementById("forgot-btn");
+    btn.disabled = true; btn.textContent = "Duke dërguar...";
+    try {
+        await sendReset(email);
+        document.getElementById("login-error").style.color = "#0b7c56";
+        document.getElementById("login-error").textContent = "✅ Email-i u dërgua te " + email + " — hap email-in dhe ndiq udhëzimet për fjalëkalim të ri.";
+    } catch (e) {
+        const map = { "auth/invalid-email": "Email-i nuk është valid.", "auth/too-many-requests": "Shumë kërkesa. Provo pas disa minutash." };
+        document.getElementById("login-error").style.color = "";
+        document.getElementById("login-error").textContent = "⚠️ " + (map[e.code] || "Provo sërish ose kontakto administratorin.");
+    }
+    btn.disabled = false; btn.textContent = "Keni harruar fjalëkalimin?";
 });
