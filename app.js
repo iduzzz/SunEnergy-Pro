@@ -53,6 +53,8 @@ const VIEWS = {
     historiku:     { t: "Historiku",          s: "Ndryshimet e fundit", ic: "🕘" },
     typeDetail:    { t: "Detajet",            s: "",               ic: "📄" },
     katDetail:     { t: "Kategoria",          s: "",               ic: "📂" },
+    summary:       { t: "Përmbledhje",        s: "",               ic: "📋" },
+    summaryMonth:  { t: "Përmbledhje mujore", s: "",               ic: "📅" },
     fitimiView:    { t: "Fitimi Neto",        s: "",               ic: "📈" }
 };
 
@@ -73,6 +75,7 @@ const S = {
     user: null, tx: [], tab: "paneli", year: String(new Date().getFullYear()),
     month: "", type: "", search: "", limit: 30, chart: null, loading: false,
     view: null, viewMonth: null, viewPartner: null, viewStack: [],
+    viewSummary: null, viewSummaryMonth: null,
     categories: [], log: []
 };
 
@@ -263,11 +266,11 @@ function monthData(year) {
     const arr = [];
     for (let m = 1; m <= 12; m++) {
         const mm = String(m).padStart(2, "0");
-        const ts = S.tx.filter(t => { const p = String(t.data || "").split("-"); return p.length === 3 && p[2] === year && p[1] === mm; });
+        const ts = S.tx.filter(t => { const p = String(t.data || "").split("-"); return p.length === 3 && (!year || p[2] === year) && p[1] === mm; });
         const shitje = ts.filter(t => t.tipi === "Shitje").reduce((s, t) => s + t.shuma, 0);
         const teArdhura = ts.filter(t => t.tipi === "Të Ardhura").reduce((s, t) => s + t.shuma, 0);
         const shpenzime = Math.abs(ts.filter(t => t.tipi === "Shpenzim").reduce((s, t) => s + t.shuma, 0));
-        arr.push({ m: mm, name: MONTHS[m - 1] + " " + year, shitje, teArdhura, shpenzime, fitimi: shitje - shpenzime, ts });
+        arr.push({ m: mm, name: MONTHS[m - 1] + (year ? " " + year : ""), shitje, teArdhura, shpenzime, fitimi: shitje - shpenzime, ts });
     }
     return arr;
 }
@@ -318,28 +321,92 @@ function rMujorDetail() {
 }
 
 function rVjetor(st) {
+    const ccard = (lbl, val, color, fn) => `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit" onclick="${fn}">
+        <div class="lbl">${lbl}</div><div class="val" style="color:${color}">${fmt(val)} MKD</div></button>`;
     let h = `<div class="sec-title">📊 PËRMBLEDHJA — ${esc(S.year || "Të gjitha vitet")}</div><div class="grid2">`;
-    h += card("SHITJET", st.shitje, "var(--green-d)");
-    h += card("TË ARDHURA NGA DEPOZITI BANKAR", st.teArdhura, "var(--green-d)");
-    h += card("SHPENZIMET", st.shpenzime, "var(--red)");
-    h += card("FITIMI NETO", st.fitimi, st.fitimi >= 0 ? "var(--green-d)" : "var(--red)");
-    h += card("INVESTIMET", st.inN + st.inG, "var(--blue)");
-    h += card("TËRHEQJET", st.thN + st.thG, "var(--purple)");
+    h += ccard("SHITJET", st.shitje, "var(--green-d)", "App.openTypeView('Shitje')");
+    h += ccard("TË ARDHURA NGA DEPOZITI BANKAR", st.teArdhura, "var(--green-d)", "App.openTypeView('Të Ardhura')");
+    h += ccard("SHPENZIMET", st.shpenzime, "var(--red)", "App.openTypeView('Shpenzim')");
+    h += ccard("FITIMI NETO", st.fitimi, st.fitimi >= 0 ? "var(--green-d)" : "var(--red)", "App.openView('fitimiView')");
+    h += ccard("INVESTIMET", st.inN + st.inG, "var(--blue)", "App.openSummary('investim')");
+    h += ccard("TËRHEQJET", st.thN + st.thG, "var(--purple)", "App.openSummary('terheqje')");
     h += `</div>`;
     h += `<button class="load-more" onclick="App.exportVjetor()">📄 Eksporto në Excel (CSV)</button>`;
     const months = monthData(S.year);
-    h += `<div class="sec-title">📅 ANALIZA MUJORE</div>`;
+    h += `<div class="sec-title">📅 ANALIZA MUJORE — kliko një muaj për detaje</div>`;
     months.forEach(mo => {
         const fitCls = mo.fitimi >= 0 ? "pos" : "neg";
-        h += `<div class="card" style="margin-bottom:10px">
+        h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:10px" onclick="App.openMonth('${mo.m}')">
             <div style="font-size:13px;font-weight:800;margin-bottom:6px">${esc(mo.name)}</div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Shitje:</span><b class="pos">${fmt(mo.shitje)} MKD</b></div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Shpenzime:</span><b class="neg">${fmt(mo.shpenzime)} MKD</b></div>
             <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="color:var(--muted)">Fitimi:</span><b class="${fitCls}">${fmt(mo.fitimi)} MKD</b></div>
-        </div>`;
+        </button>`;
     });
     return h;
 }
+
+// përmbledhje mujore për një tip (investim/tërheqje) + ortak opsional
+function summaryList(kind, partner) {
+    const arr = [];
+    for (let m = 1; m <= 12; m++) {
+        const mm = String(m).padStart(2, "0");
+        const ts = S.tx.filter(t => {
+            const p = String(t.data || "").split("-");
+            return p.length === 3 && (!S.year || p[2] === S.year) && p[1] === mm
+                && t.tipi === kind && (!partner || t.kategoria === partner);
+        });
+        arr.push({ m: mm, name: MONTHS[m - 1], ts, total: ts.reduce((s, t) => s + Math.abs(t.shuma), 0) });
+    }
+    return arr;
+}
+
+function rSummary() {
+    const { kind, partner } = S.viewSummary;
+    const rows = summaryList(kind, partner);
+    const total = rows.reduce((s, r) => s + r.total, 0);
+    let h = `<div class="card" style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted)">TOTALI — ${esc(S.year || "Të gjitha vitet")}</div>
+        <div style="font-size:20px;font-weight:800" class="${kind === "terheqje" ? "neg" : "pos"}">${kind === "terheqje" ? "−" : "+"}${fmt(total)} MKD</div>
+    </div>`;
+    const st = stats(S.year);
+    if (kind === "terheqje" && !partner) {
+        h += `<div class="sec-title">👥 SIPAS ORTAKËVE — kliko për mujore</div>`;
+        [["Nexha", st.thN], ["Gresa", st.thG]].forEach(([p, v]) => {
+            h += `<button class="row-card" onclick="App.openSummary('terheqje', '${p}')">
+                <div class="row-ic" style="background:#f3e8ff">👩</div>
+                <div class="row-tx"><b>${p}</b><span>Tërheqjet mujore</span></div>
+                <div class="row-val neg">−${fmt(v)} MKD</div></button>`;
+        });
+    }
+    h += `<div class="sec-title">📅 MUJ PËR MUAJ — kliko për detaje</div>`;
+    rows.filter(r => r.ts.length).forEach(r => {
+        h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openSummaryMonth('${r.m}')">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:13px;font-weight:800">📅 ${esc(r.name)}</div>
+                <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="${kind === "terheqje" ? "neg" : "pos"}">${kind === "terheqje" ? "−" : "+"}${fmt(r.total)} MKD</div>
+                <div style="font-size:11px;color:var(--muted)">${r.ts.length} transaksione</div></div>
+            </div>
+        </button>`;
+    });
+    if (!rows.some(r => r.ts.length)) h += `<div class="empty">Nuk ka transaksione për këtë periudhë.</div>`;
+    return h;
+}
+
+function rSummaryMonth() {
+    const { kind, partner } = S.viewSummary;
+    const r = summaryList(kind, partner).find(x => x.m === S.viewSummaryMonth);
+    if (!r) return "";
+    let h = `<div class="card" style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted)">${esc(r.name.toUpperCase())}</div>
+        <div style="font-size:20px;font-weight:800" class="${kind === "terheqje" ? "neg" : "pos"}">${kind === "terheqje" ? "−" : "+"}${fmt(r.total)} MKD</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${r.ts.length} transaksione</div>
+    </div>`;
+    h += r.ts.length ? r.ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione.</div>`;
+    return h;
+}
+
+// ============================================================ App — veprimet
 
 function rFinanciar(st) {
     const katMap = {};
@@ -473,6 +540,12 @@ function render() {
     }
     if (S.view === "fitimiView") { title = "Fitimi Neto"; sub = S.year || "Të gjitha vitet"; }
     if (S.view === "katDetail" && S.viewKat) { title = S.viewKat; sub = "Harxhimet e kategorisë — " + (S.year || "Të gjitha vitet"); }
+    if ((S.view === "summary" || S.view === "summaryMonth") && S.viewSummary) {
+        const { kind, partner } = S.viewSummary;
+        title = kind === "terheqje" ? (partner ? "Tërheqjet e " + partner : "Tërheqjet") : (partner ? "Investimi — " + PARTNER_INVEST[partner] : "Investimet");
+        if (S.view === "summaryMonth" && S.viewSummaryMonth) title += " — " + MONTHS[parseInt(S.viewSummaryMonth, 10) - 1];
+        sub = S.year || "Të gjitha vitet";
+    }
     document.getElementById("hd-title").textContent = title;
     document.getElementById("hd-sub").textContent = sub;
     document.getElementById("year-select").style.display = (!inView && S.tab === "menu") ? "none" : "";
@@ -488,6 +561,8 @@ function render() {
     else if (S.view === "historiku") html = rHistoriku();
     else if (S.view === "typeDetail") html = rTypeDetail(st);
     else if (S.view === "katDetail") html = rKatDetail(st);
+    else if (S.view === "summary") html = rSummary();
+    else if (S.view === "summaryMonth") html = rSummaryMonth();
     else if (S.view === "fitimiView") html = rFitimi(st);
     else if (S.tab === "paneli") html = rPaneli(st);
     else if (S.tab === "trans") html = rTrans();
@@ -591,7 +666,7 @@ function rKatDetail(st) {
 const App = {
     state: S,  // qasje për debug/testim
     go(tab) {
-        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = [];
+        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = []; S.viewSummary = null; S.viewSummaryMonth = null;
         UI.closeSheet(); UI.closeForm();
         document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === tab));
         const meta = TABS[tab];
@@ -610,11 +685,12 @@ const App = {
     more() { S.limit += 30; fillTxList(); },
     toggleTx(el) { document.querySelectorAll(".tx-card.open").forEach(c => { if (c !== el) c.classList.remove("open"); }); el.classList.toggle("open"); },
 
-    pushView() { S.viewStack.push({ view: S.view, viewMonth: S.viewMonth, viewPartner: S.viewPartner, tab: S.tab }); },
+    pushView() { S.viewStack.push({ view: S.view, viewMonth: S.viewMonth, viewPartner: S.viewPartner, tab: S.tab, viewSummary: S.viewSummary, viewSummaryMonth: S.viewSummaryMonth }); },
     openView(id) { this.pushView(); S.view = id; S.limit = 30; UI.closeSheet(); UI.closeForm(); render(); window.scrollTo(0, 0); },
     back() {
-        const prev = S.viewStack.pop() || { view: null, viewMonth: null, viewPartner: null, tab: S.tab };
+        const prev = S.viewStack.pop() || { view: null, viewMonth: null, viewPartner: null, tab: S.tab, viewSummary: null, viewSummaryMonth: null };
         S.view = prev.view; S.viewMonth = prev.viewMonth; S.viewPartner = prev.viewPartner; S.tab = prev.tab;
+        S.viewSummary = prev.viewSummary; S.viewSummaryMonth = prev.viewSummaryMonth;
         document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === S.tab));
         render(); window.scrollTo(0, 0);
     },
@@ -642,6 +718,17 @@ const App = {
         ts.forEach(t => rows.push([t.data, t.tipi, t.pershkrimi, t.kategoria, fmt(t.shuma) + " MKD"]));
         downloadCsv("SunEnergy_" + label + ".csv", rows);
         UI.toast("📥 CSV u shkarkua");
+    },
+    openSummary(kind, partner) {
+        this.pushView();
+        S.viewSummary = { kind, partner: partner || null };
+        S.viewSummaryMonth = null;
+        S.view = "summary"; render(); window.scrollTo(0, 0);
+    },
+    openSummaryMonth(m) {
+        this.pushView();
+        S.viewSummaryMonth = m;
+        S.view = "summaryMonth"; render(); window.scrollTo(0, 0);
     },
     openKatView(k) {
         this.pushView();
