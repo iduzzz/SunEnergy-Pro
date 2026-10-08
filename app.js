@@ -555,8 +555,11 @@ function render() {
     if (S.loading) return;
     document.getElementById("add-grid").innerHTML =
         ADD_TYPES.map(a => `<button onclick="App.openAdd('${a.key}')">${a.lbl}</button>`).join("");
-    document.getElementById("year-select").innerHTML =
-        `<option value="" ${S.year === "" ? "selected" : ""}>Të gjitha vitet</option>` +
+    const mujoreMode = S.view === "raporteMujore" || S.view === "mujor";
+    const yearSel = document.getElementById("year-select");
+    yearSel.onchange = function () { mujoreMode ? App.setYearMujor(this.value) : App.setYear(this.value); };
+    yearSel.innerHTML =
+        (mujoreMode ? "" : `<option value="" ${S.year === "" ? "selected" : ""}>Të gjitha vitet</option>`) +
         years().map(y => `<option value="${y}" ${y === S.year ? "selected" : ""}>${y}</option>`).join("");
 
     // koka: buton prapa kur është hapur një raport
@@ -838,6 +841,10 @@ const App = {
     openView(id) {
         if (id === "raporteMujore" && !S.year) S.year = String(new Date().getFullYear());
         this.pushView(); S.view = id; S.limit = 30; UI.closeSheet(); UI.closeForm(); render(); window.scrollTo(0, 0);
+    },
+    setYearMujor(v) {
+        // te Raporte Mujore "Të gjitha vitet" nuk lejohet — ktheje në vit aktual
+        this.setYear(v || String(new Date().getFullYear()));
     },
     back() {
         const prev = S.viewStack.pop() || { view: null, viewMonth: null, viewPartner: null, tab: S.tab, viewSummary: null, viewSummaryMonth: null, viewKatMonth: null, viewTypeYear: null, viewKatYear: null };
