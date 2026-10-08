@@ -472,18 +472,7 @@ function rFinanciar(st) {
             </div>
         </button>`;
     });
-    const months = monthData(S.year);
-    h += `<div class="sec-title">📅 ANALIZA MUJORE</div>`;
-    months.forEach(mo => {
-        if (!mo.ts.length && !mo.shitje && !mo.shpenzime) return;
-        const fitCls = mo.fitimi >= 0 ? "pos" : "neg";
-        h += `<div class="card" style="margin-bottom:10px">
-            <div style="font-size:13px;font-weight:800;margin-bottom:6px">${esc(mo.name)}</div>
-            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Shitje (hyrjet):</span><b class="pos">${fmt(mo.shitje)} MKD</b></div>
-            <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px"><span style="color:var(--muted)">Harxhimet:</span><b class="neg">${fmt(mo.shpenzime)} MKD</b></div>
-            <div style="display:flex;justify-content:space-between;font-size:12.5px"><span style="color:var(--muted)">Fitimi:</span><b class="${fitCls}">${fmt(mo.fitimi)} MKD</b></div>
-        </div>`;
-    });
+    h += `<p class="note">📅 Analiza mujore e gjen te: Raporte → Raporte Mujore</p>`;
     return h;
 }
 
