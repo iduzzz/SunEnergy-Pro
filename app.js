@@ -80,6 +80,7 @@ const S = {
     view: null, viewMonth: null, viewPartner: null, viewStack: [],
     viewSummary: null, viewSummaryMonth: null,
     viewKatMonth: null, viewTypeYear: null, viewKatYear: null,
+    expandedKatIdx: null,
     categories: [], log: []
 };
 
@@ -439,9 +440,10 @@ function rFinanciar(st) {
     const katMap = {};
     st.ts.filter(t => t.tipi === "Shpenzim").forEach(t => {
         const k = t.kategoria || "Te tjera";
-        katMap[k] = (katMap[k] || 0) + Math.abs(t.shuma);
+        if (!katMap[k]) katMap[k] = { sum: 0, count: 0 };
+        katMap[k].sum += Math.abs(t.shuma); katMap[k].count++;
     });
-    const katList = Object.entries(katMap).sort((a, b) => b[1] - a[1]);
+    const katList = Object.entries(katMap).sort((a, b) => b[1].sum - a[1].sum);
     const ccard = (lbl, val, color, fn) => `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit" onclick="${fn}">
         <div class="lbl">${lbl}</div><div class="val" style="color:${color}">${fmt(val)} MKD</div></button>`;
     let h = `<div class="sec-title">📊 RAPORTI FINANCIAR — ${esc(S.year || "Të gjitha vitet")}</div><div class="grid2">`;
@@ -460,14 +462,14 @@ function rFinanciar(st) {
     h += ort("💸", "Tërheqjet e Gresa", "Muj-për-muaj", fmt(st.thG), "neg", "App.openSummary('terheqje', 'Gresa')");
     h += ort("💼", "Nexha ka dhanë për Toyota", "Investimi — muj-për-muaj", fmt(st.inN), "pos", "App.openSummary('investim', 'Nexha')");
     h += ort("💼", "Gresa ka dhanë për Mercedes", "Investimi — muj-për-muaj", fmt(st.inG), "pos", "App.openSummary('investim', 'Gresa')");
-    h += `<div class="sec-title">📂 HARXHIMET SIPAS KATEGORIVE</div>`;
+    h += `<div class="sec-title">📂 HARXHIMET SIPAS KATEGORIVE — kliko për detajet</div>`;
     if (!katList.length) h += `<div class="empty">Nuk ka harxhime për këtë periudhë.</div>`;
-    katList.forEach(([k, v]) => {
-        const pct = st.shpenzime > 0 ? ((v / st.shpenzime) * 100).toFixed(1) : "0.0";
-        h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openKatView('${esc(k).replace(/'/g, "\\'")}')"">
+    katList.forEach(([k, kv]) => {
+        const pct = st.shpenzime > 0 ? ((kv.sum / st.shpenzime) * 100).toFixed(1) : "0.0";
+        h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openKatView('${esc(k).replace(/'/g, "\'")}')"">
             <div style="display:flex;justify-content:space-between;align-items:center">
-                <div style="font-size:13px;font-weight:700">📂 ${esc(k)}</div>
-                <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="neg">${fmt(v)} MKD</div>
+                <div style="font-size:13px;font-weight:700">📂 ${esc(k)} <span style="font-size:11px;color:var(--muted);font-weight:600">(${kv.count} transaksione)</span></div>
+                <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="neg">${fmt(kv.sum)} MKD</div>
                 <div style="font-size:11px;color:var(--muted)">${pct}% e harxhimeve</div></div>
             </div>
         </button>`;
@@ -662,17 +664,58 @@ async function saveCategories() {
     render();
 }
 
+function katAccordionHtml(ts) {
+    const katMap = {};
+    ts.forEach(t => {
+        const k = t.kategoria || "Te tjera";
+        if (!katMap[k]) katMap[k] = { sum: 0, count: 0, ts: [] };
+        katMap[k].sum += Math.abs(t.shuma); katMap[k].count++; katMap[k].ts.push(t);
+    });
+    const katList = Object.entries(katMap).sort((a, b) => b[1].sum - a[1].sum);
+    const absTotal = ts.reduce((s, t) => s + Math.abs(t.shuma), 0);
+    let h = `<div class="sec-title">📂 SIPAS KATEGORIVE — kliko për të zgjeruar</div>`;
+    if (!katList.length) { h += `<div class="empty">Nuk ka harxhime.</div>`; return h; }
+    katList.forEach(([k, kv], i) => {
+        const open = S.expandedKatIdx === i;
+        Object.defineProperty(kv, "name", { value: k, configurable: true });
+        kv.ts.sort((a, b) => { const pa = String(a.data || "").split("-"), pb = String(b.data || "").split("-"); return (new Date(pb[2], pb[1] - 1, pb[0]) - new Date(pa[2], pa[1] - 1, pa[0])) || 0; });
+        h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:${open ? "4px" : "8px"}" onclick="App.toggleKatIdx(${i})">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:13px;font-weight:700">${open ? "▼" : "▶"} 📂 ${esc(k)} <span style="font-size:11px;color:var(--muted);font-weight:600">(${kv.count} transaksione)</span></div>
+                <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="neg">−${fmt(kv.sum)} MKD</div>
+                <div style="font-size:11px;color:var(--muted)">${absTotal > 0 ? ((kv.sum / absTotal) * 100).toFixed(1) : "0.0"}% e harxhimeve</div></div>
+            </div>
+        </button>`;
+        if (open) h += `<div style="margin:-2px 0 12px">${kv.ts.map(txCard).join("")}</div>`;
+    });
+    return h;
+}
+
+function statsCardHtml(total, count, signedLabel) {
+    const absTotal = Math.abs(total);
+    const avg = count ? absTotal / count : 0;
+    const cls = total >= 0 ? "pos" : "neg";
+    const sign = total < 0 ? "−" : "";
+    return `<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+            <span style="font-size:12px;font-weight:700;color:var(--muted)">TOTALI</span>
+            <span style="font-size:12px;font-weight:700;color:var(--muted)">MESATARJA</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+            <span style="font-size:20px;font-weight:800" class="${cls}">${sign}${fmt(absTotal)} MKD</span>
+            <span style="font-size:14px;font-weight:800;color:var(--muted)">${fmt(avg)} MKD</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--muted)">NUMRI: ${count} ${signedLabel || "transaksione"}</div>
+    </div>`;
+}
+
 function rTypeDetail(st) {
     const vt = S.viewType;
     const ts = st.ts.filter(t => t.tipi === vt.tipi && (!vt.partner || t.kategoria === vt.partner));
     const total = ts.reduce((s, t) => s + t.shuma, 0);
-    let h = `<div class="card" style="margin-bottom:12px">
-        <div style="font-size:12px;font-weight:700;color:var(--muted)">TOTALI</div>
-        <div style="font-size:20px;font-weight:800" class="${total >= 0 ? "pos" : "neg"}">${fmt(total)} MKD</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${ts.length} transaksione</div>
-    </div>`;
+    let h = statsCardHtml(total, ts.length);
 
-    // "Të gjitha vitet": përmbledhje vit-për-vit (klikueshme), pa listë gjigante
+    // "Të gjitha vitet": përmbledhje vit-për-vit (klikueshme)
     if (!S.year) {
         const byYear = {};
         ts.forEach(t => {
@@ -695,26 +738,13 @@ function rTypeDetail(st) {
         return h;
     }
 
-    // vit i vetëm + Shpenzim: përmbledhje sipas kategorive (klikueshme)
+    // Shpenzimet: grupore sipas kategorive (palosshme, si aplikacioni i vjetër)
     if (vt.tipi === "Shpenzim" && !vt.partner) {
-        const katMap = {};
-        ts.forEach(t => { const k = t.kategoria || "Te tjera"; katMap[k] = (katMap[k] || 0) + Math.abs(t.shuma); });
-        const katList = Object.entries(katMap).sort((a, b) => b[1] - a[1]);
-        if (katList.length) {
-            h += `<div class="sec-title">📂 SIPAS KATEGORIVE — kliko për detajet</div>`;
-            katList.forEach(([k, v]) => {
-                const escK = esc(k).replace(/'/g, "\\'");
-                h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openKatView('${escK}')">
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <div style="font-size:13px;font-weight:700">📂 ${esc(k)}</div>
-                        <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="neg">−${fmt(v)} MKD</div>
-                        <div style="font-size:11px;color:var(--muted)">${total > 0 ? ((v / total) * 100).toFixed(1) : "0.0"}% të shpenzimeve</div></div>
-                    </div>
-                </button>`;
-            });
-            h += `<div class="sec-title">📄 TË GJITHA TRANSAKSIONET</div>`;
-        }
+        h += katAccordionHtml(ts);
+        h += `<button class="load-more" onclick="App.exportTypeDetail()">📄 Eksporto në Excel (CSV)</button>`;
+        return h;
     }
+
     h += `<button class="load-more" onclick="App.exportTypeDetail()">📄 Eksporto në Excel (CSV)</button>`;
     h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione për këtë periudhë.</div>`;
     return h;
@@ -728,11 +758,12 @@ function rTypeYear() {
         (() => { const p = String(t.data || "").split("-"); return p.length === 3 && p[2] === ty.year; })());
     const total = ts.reduce((s, t) => s + t.shuma, 0);
     ts.sort((a, b) => { const pa = String(a.data || "").split("-"), pb = String(b.data || "").split("-"); return (new Date(pb[2], pb[1] - 1, pb[0]) - new Date(pa[2], pa[1] - 1, pa[0])) || 0; });
-    let h = `<div class="card" style="margin-bottom:12px">
-        <div style="font-size:12px;font-weight:700;color:var(--muted)">TOTALI ${esc(ty.year)}</div>
-        <div style="font-size:20px;font-weight:800" class="${total >= 0 ? "pos" : "neg"}">${fmt(total)} MKD</div>
-        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${ts.length} transaksione</div>
-    </div>`;
+    let h = statsCardHtml(total, ts.length, "transaksione — " + ty.year);
+    if (vt.tipi === "Shpenzim" && !vt.partner) {
+        h += katAccordionHtml(ts);
+        h += `<button class="load-more" onclick="App.exportTypeYear()">📄 Eksporto në Excel (CSV)</button>`;
+        return h;
+    }
     h += `<button class="load-more" onclick="App.exportTypeYear()">📄 Eksporto në Excel (CSV)</button>`;
     h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione.</div>`;
     return h;
@@ -807,7 +838,7 @@ function rKatDetail(st) {
 const App = {
     state: S,  // qasje për debug/testim
     go(tab) {
-        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = []; S.viewSummary = null; S.viewSummaryMonth = null; S.viewKatMonth = null; S.viewTypeYear = null; S.viewKatYear = null;
+        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = []; S.viewSummary = null; S.viewSummaryMonth = null; S.viewKatMonth = null; S.viewTypeYear = null; S.viewKatYear = null; S.expandedKatIdx = null;
         UI.closeSheet(); UI.closeForm();
         document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === tab));
         const meta = TABS[tab];
@@ -853,7 +884,14 @@ const App = {
     openTypeView(tipi, partner) {
         this.pushView();
         S.viewType = { tipi, partner: partner || null };
+        S.expandedKatIdx = null;
         S.view = "typeDetail"; render(); window.scrollTo(0, 0);
+    },
+    toggleKatIdx(i) {
+        S.expandedKatIdx = (S.expandedKatIdx === i) ? null : i;
+        render();
+        const open = document.querySelector('.tx-card');
+        if (open && S.expandedKatIdx !== null) open.scrollIntoView({ behavior: "smooth", block: "nearest" });
     },
     exportTypeDetail() {
         const vt = S.viewType;
@@ -904,6 +942,7 @@ const App = {
     openTypeYear(y) {
         this.pushView();
         S.viewTypeYear = { ...S.viewType, year: y };
+        S.expandedKatIdx = null;
         S.view = "typeYear"; render(); window.scrollTo(0, 0);
     },
     openKatYear(y) {
