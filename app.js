@@ -763,17 +763,20 @@ function rTypeDetail(st) {
     const vt = S.viewType;
     const ts = st.ts.filter(t => t.tipi === vt.tipi && (!vt.partner || t.kategoria === vt.partner));
     const total = ts.reduce((s, t) => s + t.shuma, 0);
+    const isShpenzim = vt.tipi === "Shpenzim" && !vt.partner;
     let h = statsCardHtml(total, ts.length);
 
-    // "Të gjitha vitet": përmbledhje vit-për-vit (klikueshme)
+    // Shpenzimet: grupim kumulative sipas kategorive — si me vit ashtu edhe me të gjitha vitet
+    if (isShpenzim) h += katAccordionHtml(ts);
+
     if (!S.year) {
+        h += `<div class="sec-title">${isShpenzim ? "📅 OSE SIPAS VITEVE" : "📅 SIPAS VITEVE"} — kliko për detajet</div>`;
         const byYear = {};
         ts.forEach(t => {
             const y = String(t.data || "").split("-")[2];
             if (!byYear[y]) byYear[y] = { sum: 0, count: 0 };
             byYear[y].sum += t.shuma; byYear[y].count++;
         });
-        h += `<div class="sec-title">📅 SIPAS VITEVE — kliko për detajet</div>`;
         Object.keys(byYear).sort().reverse().forEach(y => {
             const yv = byYear[y];
             h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openTypeYear('${y}')">
@@ -788,15 +791,8 @@ function rTypeDetail(st) {
         return h;
     }
 
-    // Shpenzimet: grupore sipas kategorive (palosshme, si aplikacioni i vjetër)
-    if (vt.tipi === "Shpenzim" && !vt.partner) {
-        h += katAccordionHtml(ts);
-        h += `<button class="load-more" onclick="App.exportTypeDetail()">📄 Eksporto në Excel (CSV)</button>`;
-        return h;
-    }
-
     h += `<button class="load-more" onclick="App.exportTypeDetail()">📄 Eksporto në Excel (CSV)</button>`;
-    h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione për këtë periudhë.</div>`;
+    if (!isShpenzim) h += ts.length ? ts.map(txCard).join("") : `<div class="empty">Nuk ka transaksione për këtë periudhë.</div>`;
     return h;
 }
 
@@ -843,9 +839,33 @@ function rFitimi(st) {
         <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:8px"><span style="color:var(--muted)">🔋 − Shpenzimet</span><b class="neg">${fmt(st.shpenzime)} MKD</b></div>
         <div style="display:flex;justify-content:space-between;font-size:15px;padding-top:10px;border-top:2px solid var(--line)"><b>📈 Fitimi Neto</b><b class="${st.fitimi >= 0 ? "pos" : "neg"}">${fmt(st.fitimi)} MKD</b></div>
     </div>`;
-    const komponentet = st.ts.filter(t => t.tipi === "Shitje" || t.tipi === "Shpenzim");
-    h += `<div class="sec-title">📄 TRANSAKSIONET QË E PËRBEJNË</div>`;
-    h += komponentet.length ? komponentet.map(txCard).join("") : `<div class="empty">Nuk ka transaksione.</div>`;
+    // shpenzimet e grupuara sipas kategorive (kumulative, palosshme)
+    const shpenzimet = st.ts.filter(t => t.tipi === "Shpenzim");
+    h += `<div class="sec-title">📂 SHPENZIMET SIPAS KATEGORIVE — kliko për të zgjeruar</div>`;
+    h += katAccordionHtml(shpenzimet);
+    const shitje = st.ts.filter(t => t.tipi === "Shitje");
+    if (!S.year) {
+        const byYear = {};
+        shitje.forEach(t => {
+            const y = String(t.data || "").split("-")[2];
+            if (!byYear[y]) byYear[y] = { sum: 0, count: 0 };
+            byYear[y].sum += t.shuma; byYear[y].count++;
+        });
+        h += `<div class="sec-title">💰 SHITJET SIPAS VITEVE — kliko për detajet</div>`;
+        Object.keys(byYear).sort().reverse().forEach(y => {
+            const yv = byYear[y];
+            h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:8px" onclick="App.openFitimiYear('${y}')">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div style="font-size:13px;font-weight:800">📅 ${esc(y)}</div>
+                    <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="pos">+${fmt(yv.sum)} MKD</div>
+                    <div style="font-size:11px;color:var(--muted)">${yv.count} shitje</div></div>
+                </div>
+            </button>`;
+        });
+    } else {
+        h += `<div class="sec-title">💰 SHITJET — ${esc(S.year)}</div>`;
+        h += shitje.length ? shitje.map(txCard).join("") : `<div class="empty">Nuk ka shitje.</div>`;
+    }
     return h;
 }
 
@@ -988,6 +1008,12 @@ const App = {
         vm.ts.forEach(t => rows.push([t.data, t.pershkrimi, "-" + fmt(Math.abs(t.shuma)) + " MKD"]));
         downloadCsv("SunEnergy_" + vm.kat.replace(/[^a-zA-Z0-9]/g, "_") + "_" + vm.monthName.replace(/\s/g, "_") + ".csv", rows);
         UI.toast("📥 CSV u shkarkua");
+    },
+    openFitimiYear(y) {
+        this.pushView();
+        S.viewType = { tipi: "Shitje" };
+        S.viewTypeYear = { tipi: "Shitje", year: y };
+        S.view = "typeYear"; render(); window.scrollTo(0, 0);
     },
     openWdGroups(name) {
         this.pushView();
