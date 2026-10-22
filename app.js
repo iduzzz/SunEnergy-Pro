@@ -58,6 +58,7 @@ const VIEWS = {
     katMonth:      { t: "Kategoria",          s: "",               ic: "📂" },
     typeYear:      { t: "Detajet",            s: "",               ic: "📅" },
     katYear:       { t: "Kategoria",          s: "",               ic: "📅" },
+    wdGroups:      { t: "Tërheqjet",          s: "",               ic: "🧾" },
     fitimiView:    { t: "Fitimi Neto",        s: "",               ic: "📈" }
 };
 
@@ -81,6 +82,7 @@ const S = {
     viewSummary: null, viewSummaryMonth: null,
     viewKatMonth: null, viewTypeYear: null, viewKatYear: null,
     expandedKatIdx: null,
+    viewWd: null, expandedWdIdx: null,
     categories: [], log: []
 };
 
@@ -434,6 +436,47 @@ function rSummaryMonth() {
     return h;
 }
 
+function wdAccordionHtml(ts) {
+    const map = {};
+    ts.forEach(t => {
+        const w = (String(t.pershkrimi || "").trim().split(/\s+/)[0]) || "Të tjera";
+        if (!map[w]) map[w] = { sum: 0, count: 0, ts: [] };
+        map[w].sum += Math.abs(t.shuma); map[w].count++; map[w].ts.push(t);
+    });
+    const list = Object.entries(map).sort((a, b) => b[1].sum - a[1].sum);
+    const absTotal = ts.reduce((s, t) => s + Math.abs(t.shuma), 0);
+    let h = `<div class="sec-title">🧾 SIPAS LLOJIT — kliko për të zgjeruar</div>`;
+    if (!list.length) { h += `<div class="empty">Nuk ka tërheqje.</div>`; return h; }
+    list.forEach(([w, g], i) => {
+        const open = S.expandedWdIdx === i;
+        g.ts.sort((a, b) => { const pa = String(a.data || "").split("-"), pb = String(b.data || "").split("-"); return (new Date(pb[2], pb[1] - 1, pb[0]) - new Date(pa[2], pa[1] - 1, pa[0])) || 0; });
+        h += `<button class="card" style="display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;margin-bottom:${open ? "4px" : "8px"}" onclick="App.toggleWdIdx(${i})">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:13px;font-weight:700">${open ? "▼" : "▶"} 🧾 ${esc(w)} <span style="font-size:11px;color:var(--muted);font-weight:600">(${g.count} transaksione)</span></div>
+                <div style="text-align:right"><div style="font-size:13px;font-weight:800" class="neg">−${fmt(g.sum)} MKD</div>
+                <div style="font-size:11px;color:var(--muted)">${absTotal > 0 ? ((g.sum / absTotal) * 100).toFixed(1) : "0.0"}% e tërheqjeve</div></div>
+            </div>
+        </button>`;
+        if (open) h += `<div style="margin:-2px 0 12px">${g.ts.map(txCard).join("")}</div>`;
+    });
+    return h;
+}
+
+function rWdGroups(st) {
+    const p = S.viewWd;
+    if (!p) return "";
+    const ts = st.ts.filter(t => t.tipi === "Tërheqje" && t.kategoria === p);
+    const total = ts.reduce((s, t) => s + Math.abs(t.shuma), 0);
+    let h = `<div class="card" style="margin-bottom:12px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted)">TOTALI E TËRHEQJEVE — ${esc(p)}</div>
+        <div style="font-size:20px;font-weight:800" class="neg">−${fmt(total)} MKD</div>
+        <div style="font-size:11.5px;color:var(--muted);margin-top:4px">${ts.length} tërheqje</div>
+    </div>`;
+    h += wdAccordionHtml(ts);
+    h += `<button class="load-more" onclick="App.exportWdGroups()">📄 Eksporto në Excel (CSV)</button>`;
+    return h;
+}
+
 // ============================================================ App — veprimet
 
 function rFinanciar(st) {
@@ -485,21 +528,26 @@ function rStatement(st) {
     const pjesa = name === "Nexha" ? st.pN : st.pG;
     const pjesaFitimi = (st.fitimi / 2) + (st.teArdhura / 2);
     const fitCls = v => v >= 0 ? "pos" : "neg";
+    const row = (icon, lbl, valHtml, o = {}) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px;${o.top ? "padding-top:8px;border-top:1px solid var(--line);" : ""}${o.fn ? "cursor:pointer;" : ""}"${o.fn ? ` onclick="${o.fn}"` : ""}>
+            <span style="${o.bold ? "font-weight:800;color:#111827" : "color:var(--muted)"}">${icon} ${lbl}${o.fn ? ' <span style="color:#9ca3af">›</span>' : ""}</span>
+            <span style="${o.bold ? "font-weight:800" : ""}" class="${o.cls || ""}">${valHtml}</span>
+        </div>`;
     let h = `<div class="sec-title">👤 ${esc(name)} — ${esc(S.year || "Të gjitha vitet")}</div>`;
-    h += `<div class="card" style="margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">💰 Shitja e Rrymës</span><b class="pos">${fmt(st.shitje)} MKD</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">🔋 − Shpenzimet Operative</span><b class="neg">${fmt(st.shpenzime)} MKD</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;padding-top:8px;border-top:1px solid var(--line);margin-bottom:6px"><b>📊 Fitimi Neto Operativ</b><b class="${fitCls(st.fitimi)}">${fmt(st.fitimi)} MKD</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">🏦 Të Ardhura nga Depoziti Bankar</span><b class="pos">${fmt(st.teArdhura)} MKD</b></div>
-    </div>`;
-    h += `<div class="card" style="margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">✅ 50% e Fitimit Neto</span><b class="pos">${fmt(st.fitimi / 2)} MKD</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">🏦 50% e Të Ardhurave Bankare</span><b class="pos">${fmt(st.teArdhura / 2)} MKD</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;padding-top:8px;border-top:1px solid var(--line);margin-bottom:6px"><b>📋 Gjithsej i takon ${esc(name)}</b><b class="pos">${fmt(pjesaFitimi)} MKD</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:var(--muted)">💸 Tërheqjet e ${esc(name)}</span><b class="neg">−${fmt(th)} MKD</b></div>
-        <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--muted)">💼 Investimi (kthim — ${PARTNER_INVEST[name] || ""})</span><b style="color:var(--blue)">+${fmt(inv)} MKD</b></div>
-    </div>`;
-    h += `<div class="card" style="background:${pjesa >= 0 ? "#f0fdf6" : "#fdecec"};border-color:${pjesa >= 0 ? "#cdeeda" : "#f5c6c6"}">
+    h += `<div class="card" style="margin-bottom:12px">`;
+    h += row("💰", "Shitja e Rrymës", `<b class="pos">${fmt(st.shitje)} MKD</b>`);
+    h += row("🔋", "− Shpenzimet Operative", `<b class="neg">−${fmt(st.shpenzime)} MKD</b>`, { fn: "App.openTypeView('Shpenzim')" });
+    h += row("📊", "Fitimi Neto Operativ", `<b class="${fitCls(st.fitimi)}">${fmt(st.fitimi)} MKD</b>`, { bold: true, top: true });
+    h += row("🏦", "Të Ardhura nga Depoziti Bankar", `<b class="pos">${fmt(st.teArdhura)} MKD</b>`, { fn: "App.openTypeView('Të Ardhura')" });
+    h += `</div>`;
+    h += `<div class="card" style="margin-bottom:12px">`;
+    h += row("✅", "50% e Fitimit Neto", `<b class="pos">${fmt(st.fitimi / 2)} MKD</b>`);
+    h += row("🏦", "50% e Të Ardhurave Bankare", `<b class="pos">${fmt(st.teArdhura / 2)} MKD</b>`);
+    h += row("📋", "Gjithsej i takon " + name, `<b class="pos">${fmt(pjesaFitimi)} MKD</b>`, { bold: true, top: true });
+    h += row("💸", "Tërheqjet e " + name, `<b class="neg">−${fmt(th)} MKD</b>`, { fn: `App.openWdGroups('${name}')` });
+    h += row("💼", "Investimi (kthim — " + PARTNER_INVEST[name] + ")", `<b style="color:var(--blue)">+${fmt(inv)} MKD</b>`);
+    h += `</div>`;
+    h += `<div class="card" style="background:${pjesa >= 0 ? "#f0fdf6" : "#fdecec"};border-color:${pjesa >= 0 ? "#cdeeda" : "#f5c6c6"};text-align:right">
         <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">📋 BILANCI FINAL — ${esc(name.toUpperCase())}</div>
         <div style="font-size:22px;font-weight:800" class="${fitCls(pjesa)}">${pjesa >= 0 ? "+" : ""}${fmt(pjesa)} MKD</div>
         <div style="font-size:12px;margin-top:4px" class="${fitCls(pjesa)}">${pjesa >= 0 ? "✅ " + name + " ka për të marrë edhe " + fmt(pjesa) + " MKD" : "⚠️ " + name + " ka marrë " + fmt(Math.abs(pjesa)) + " MKD më shumë se fitimi i saj"}</div>
@@ -579,6 +627,7 @@ function render() {
         sub = vt.year;
     }
     if (S.view === "katYear" && S.viewKatYear) { title = S.viewKatYear.kat; sub = "Harxhimet — " + S.viewKatYear.year; }
+    if (S.view === "wdGroups" && S.viewWd) { title = "Tërheqjet e " + S.viewWd; sub = "Sipas llojit — " + (S.year || "Të gjitha vitet"); }
     if ((S.view === "summary" || S.view === "summaryMonth") && S.viewSummary) {
         const { kind, partner } = S.viewSummary;
         title = kind === "terheqje" ? (partner ? "Tërheqjet e " + partner : "Tërheqjet") : (partner ? "Investimi — " + PARTNER_INVEST[partner] : "Investimet");
@@ -605,6 +654,7 @@ function render() {
     else if (S.view === "katMonth") html = rKatMonth();
     else if (S.view === "typeYear") html = rTypeYear();
     else if (S.view === "katYear") html = rKatYear();
+    else if (S.view === "wdGroups") html = rWdGroups(st);
     else if (S.view === "fitimiView") html = rFitimi(st);
     else if (S.tab === "paneli") html = rPaneli(st);
     else if (S.tab === "trans") html = rTrans();
@@ -838,7 +888,7 @@ function rKatDetail(st) {
 const App = {
     state: S,  // qasje për debug/testim
     go(tab) {
-        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = []; S.viewSummary = null; S.viewSummaryMonth = null; S.viewKatMonth = null; S.viewTypeYear = null; S.viewKatYear = null; S.expandedKatIdx = null;
+        S.tab = tab; S.limit = 30; S.view = null; S.viewMonth = null; S.viewPartner = null; S.viewStack = []; S.viewSummary = null; S.viewSummaryMonth = null; S.viewKatMonth = null; S.viewTypeYear = null; S.viewKatYear = null; S.expandedKatIdx = null; S.viewWd = null; S.expandedWdIdx = null;
         UI.closeSheet(); UI.closeForm();
         document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === tab));
         const meta = TABS[tab];
@@ -857,7 +907,7 @@ const App = {
     more() { S.limit += 30; fillTxList(); },
     toggleTx(el) { document.querySelectorAll(".tx-card.open").forEach(c => { if (c !== el) c.classList.remove("open"); }); el.classList.toggle("open"); },
 
-    pushView() { S.viewStack.push({ view: S.view, viewMonth: S.viewMonth, viewPartner: S.viewPartner, tab: S.tab, viewSummary: S.viewSummary, viewSummaryMonth: S.viewSummaryMonth, viewKatMonth: S.viewKatMonth, viewTypeYear: S.viewTypeYear, viewKatYear: S.viewKatYear }); },
+    pushView() { S.viewStack.push({ view: S.view, viewMonth: S.viewMonth, viewPartner: S.viewPartner, tab: S.tab, viewSummary: S.viewSummary, viewSummaryMonth: S.viewSummaryMonth, viewKatMonth: S.viewKatMonth, viewTypeYear: S.viewTypeYear, viewKatYear: S.viewKatYear, viewWd: S.viewWd }); },
     openView(id) {
         if (id === "raporteMujore" && !S.year) S.year = String(new Date().getFullYear());
         this.pushView(); S.view = id; S.limit = 30; UI.closeSheet(); UI.closeForm(); render(); window.scrollTo(0, 0);
@@ -867,10 +917,10 @@ const App = {
         this.setYear(v || String(new Date().getFullYear()));
     },
     back() {
-        const prev = S.viewStack.pop() || { view: null, viewMonth: null, viewPartner: null, tab: S.tab, viewSummary: null, viewSummaryMonth: null, viewKatMonth: null, viewTypeYear: null, viewKatYear: null };
+        const prev = S.viewStack.pop() || { view: null, viewMonth: null, viewPartner: null, tab: S.tab, viewSummary: null, viewSummaryMonth: null, viewKatMonth: null, viewTypeYear: null, viewKatYear: null, viewWd: null };
         S.view = prev.view; S.viewMonth = prev.viewMonth; S.viewPartner = prev.viewPartner; S.tab = prev.tab;
         S.viewSummary = prev.viewSummary; S.viewSummaryMonth = prev.viewSummaryMonth; S.viewKatMonth = prev.viewKatMonth;
-        S.viewTypeYear = prev.viewTypeYear; S.viewKatYear = prev.viewKatYear;
+        S.viewTypeYear = prev.viewTypeYear; S.viewKatYear = prev.viewKatYear; S.viewWd = prev.viewWd;
         document.querySelectorAll(".tabbar button[data-tab]").forEach(b => b.classList.toggle("act", b.dataset.tab === S.tab));
         render(); window.scrollTo(0, 0);
     },
@@ -937,6 +987,27 @@ const App = {
             ["Data", "Përshkrimi", "Shuma"]];
         vm.ts.forEach(t => rows.push([t.data, t.pershkrimi, "-" + fmt(Math.abs(t.shuma)) + " MKD"]));
         downloadCsv("SunEnergy_" + vm.kat.replace(/[^a-zA-Z0-9]/g, "_") + "_" + vm.monthName.replace(/\s/g, "_") + ".csv", rows);
+        UI.toast("📥 CSV u shkarkua");
+    },
+    openWdGroups(name) {
+        this.pushView();
+        S.viewWd = name;
+        S.expandedWdIdx = null;
+        S.view = "wdGroups"; render(); window.scrollTo(0, 0);
+    },
+    toggleWdIdx(i) {
+        S.expandedWdIdx = (S.expandedWdIdx === i) ? null : i;
+        render();
+    },
+    exportWdGroups() {
+        const p = S.viewWd;
+        const ts = stats(S.year).ts.filter(t => t.tipi === "Tërheqje" && t.kategoria === p);
+        const total = ts.reduce((s, t) => s + Math.abs(t.shuma), 0);
+        const rows = [["SunEnergy Pro — Terheqjet e " + p + " (" + (S.year || "Te gjitha vitet") + ")"], [],
+            ["Totali", "-" + fmt(total) + " MKD"], ["Numri", ts.length], [],
+            ["Data", "Përshkrimi", "Shuma"]];
+        ts.forEach(t => rows.push([t.data, t.pershkrimi, "-" + fmt(Math.abs(t.shuma)) + " MKD"]));
+        downloadCsv("SunEnergy_Terheqjet_" + p + ".csv", rows);
         UI.toast("📥 CSV u shkarkua");
     },
     openTypeYear(y) {
